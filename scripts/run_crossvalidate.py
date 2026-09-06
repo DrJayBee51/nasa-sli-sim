@@ -77,6 +77,7 @@ def main() -> int:
     vehicle = Vehicle.from_yaml(args.vehicle)
     site = Site.from_yaml(args.site)
     out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)   # gitignored; absent in a fresh clone
     ballast = vehicle.ballast_min_kg if args.ballast == "min" else vehicle.ballast_max_kg
 
     print(f"Vehicle : {vehicle.name}")

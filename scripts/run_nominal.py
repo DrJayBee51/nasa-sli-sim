@@ -33,6 +33,7 @@ def main() -> int:
     vehicle = Vehicle.from_yaml(args.vehicle)
     site = Site.from_yaml(args.site)
     out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)   # gitignored; absent in a fresh clone
 
     print(f"Vehicle : {vehicle.name}  [{vehicle.status}]")
     print(f"Site    : {site.name}")

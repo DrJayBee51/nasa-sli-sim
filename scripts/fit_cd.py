@@ -50,6 +50,9 @@ def main() -> int:
     vehicle = Vehicle.from_yaml(args.vehicle)
     site = Site.from_yaml(args.site)
     out_dir = Path(args.out)
+    # Created up front: output/ is gitignored, so it does not exist in a fresh
+    # clone, and results are written at several points below.
+    out_dir.mkdir(parents=True, exist_ok=True)
     ballast_kg = U.lb_to_kg(args.ballast_lb)
 
     measured = postflight.load_altimeter_csv(
@@ -111,7 +114,6 @@ def main() -> int:
     print("  Then re-run run_montecarlo.py: the apogee spread should shrink")
     print("  substantially, which is what improves the req 2.3 altitude score.")
 
-    out_dir.mkdir(parents=True, exist_ok=True)
     report.write_markdown(
         out_dir / "postflight_cd_fit.md",
         f"Post-flight drag fit - {vehicle.name}",
