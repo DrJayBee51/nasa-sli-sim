@@ -1,0 +1,23 @@
+# NASA SLI simulation framework
+#
+# Python 3.12 or 3.13 required.  RocketPy's dependency stack does not yet have
+# wheels across the board for 3.14, and this project was verified on 3.13.15.
+#
+# Also required, outside pip:
+#   * A Java 17+ JDK, for the headless OpenRocket bridge.
+#       Windows : winget install Microsoft.OpenJDK.17
+#       macOS   : brew install --cask temurin17
+#       Linux   : sudo apt install openjdk-17-jdk
+#   * vendor/OpenRocket-24.12.jar  (see README, one curl command)
+#
+# Versions pinned to what this framework was verified against.  Loosen them
+# deliberately, not by accident: OpenRocket's Java package names changed in
+# 23.09 and RocketPy's parachute-trigger signature changed in 1.13.
+
+rocketpy==1.13.0
+jpype1==1.7.1
+numpy==2.5.2
+scipy==1.18.1
+pandas==3.0.5
+matplotlib==3.11.1
+PyYAML==6.0.3

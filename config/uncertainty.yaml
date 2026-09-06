@@ -1,0 +1,118 @@
+# =============================================================================
+#  MONTE CARLO DISPERSIONS
+# =============================================================================
+#  This file is the whole point of adding RocketPy alongside OpenRocket.  The
+#  handbook asks teams to "perform multiple simulations to verify that results
+#  are precise" (PDR/CDR/FRR Mission Performance Predictions).  Most teams
+#  answer that by running OpenRocket a handful of times with different winds.
+#  Sampling these distributions answers it properly, and turns the apogee
+#  requirement (2.1) into a probability rather than a single number.
+#
+#  Each entry is:  distribution + parameters, in the units named by the key.
+#  Supported: normal(mean_shift, sigma) | uniform(low, high) | truncnormal(...)
+#
+#  *** These sigmas are DEFENSIBLE STARTING POINTS, not measurements. ***
+#  Replace each one with a value the team can justify:
+#    - mass sigmas   -> weigh sections repeatedly, use the observed spread
+#    - Cd sigma      -> from the OR-vs-RocketPy spread and post-flight Cd fits
+#    - motor sigma   -> manufacturer lot-to-lot data / thrustcurve.org spread
+#    - wind          -> historical data for the site and month
+#  Every reported result should cite which version of this file produced it.
+# =============================================================================
+
+# --- Vehicle ----------------------------------------------------------------
+dry_mass:
+  # Fractional error on total dry mass. 1.5% of ~35 lb is ~0.5 lb, which is a
+  # realistic build tolerance (epoxy, paint, wiring, fillets).
+  distribution: normal
+  relative: true
+  mean: 1.0
+  sigma: 0.015
+
+cg_shift:
+  # Absolute shift of the dry CG, metres. Positive = aft. Drives stability.
+  distribution: normal
+  mean: 0.0
+  sigma: 0.010          # +/- 1 cm 1-sigma
+
+drag_coefficient:
+  # Multiplier on the power-on/off drag curve. This is the single largest
+  # driver of apogee scatter and the hardest thing to know before you fly --
+  # which is why scripts/fit_cd.py exists to shrink it after the demo flight.
+  distribution: normal
+  relative: true
+  mean: 1.0
+  sigma: 0.070          # 7% 1-sigma pre-flight; expect ~3% after a Cd fit
+
+# --- Motor ------------------------------------------------------------------
+motor_total_impulse:
+  distribution: normal
+  relative: true
+  mean: 1.0
+  sigma: 0.020          # ~2%, typical APCP lot-to-lot
+motor_burn_time:
+  distribution: normal
+  relative: true
+  mean: 1.0
+  sigma: 0.015
+motor_dry_mass:
+  distribution: normal
+  relative: true
+  mean: 1.0
+  sigma: 0.010
+
+# --- Launch conditions ------------------------------------------------------
+rail_angle_deg:
+  # Off-vertical rail angle. RSO typically sets 5-10 deg into the wind.
+  distribution: normal
+  mean: 5.0
+  sigma: 1.5
+rail_direction_deg:
+  distribution: uniform
+  low: 0.0
+  high: 360.0
+
+wind_speed_mps:
+  # Mean is taken from the site file; this is the dispersion about it.
+  # Truncated at 0 so we never sample a negative wind speed.
+  distribution: truncnormal
+  mean: null            # null -> use site nominal
+  sigma: null           # null -> use site wind_speed_sigma_mps
+  low: 0.0
+  high: 12.0            # ~27 mph; above this the RSO scrubs anyway
+wind_direction_deg:
+  distribution: normal
+  mean: null            # null -> use site nominal
+  sigma: null           # null -> use site wind_direction_sigma_deg
+
+temperature_k:
+  distribution: normal
+  mean: null
+  sigma: 6.0
+pressure_pa:
+  distribution: normal
+  mean: null
+  sigma: 900.0
+
+# --- Recovery ---------------------------------------------------------------
+drogue_cd:
+  distribution: normal
+  relative: true
+  mean: 1.0
+  sigma: 0.10           # parachute Cd is genuinely uncertain at this scale
+main_cd:
+  distribution: normal
+  relative: true
+  mean: 1.0
+  sigma: 0.10
+main_deploy_altitude_ft:
+  # Barometric altimeter scatter + porting effects.
+  distribution: normal
+  mean: 0.0             # shift applied to the nominal deploy altitude
+  sigma: 25.0
+drogue_deploy_delay_s:
+  distribution: truncnormal
+  mean: 0.0             # shift on nominal delay
+  sigma: 0.25
+  low: -1.0
+  high: 1.0             # req 3.1.2 caps the total at 2.0 s; checked downstream

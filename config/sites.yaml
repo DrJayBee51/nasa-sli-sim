@@ -1,0 +1,35 @@
+# Launch sites.  `default` is used unless --site is passed.
+default: huntsville
+
+sites:
+  huntsville:
+    name: "Bragg Farms, Toney AL (NASA Student Launch competition site)"
+    latitude: 34.8964
+    longitude: -86.6162
+    elevation_m: 189.0          # ~620 ft MSL
+    rail_length_m: 3.66         # 12 ft 1515 rail, NASA-provided
+    # Typical April launch-window conditions. Replace with a forecast on
+    # launch day; `scripts/run_montecarlo.py --forecast` can pull a real
+    # atmosphere through RocketPy's Environment instead.
+    nominal:
+      wind_speed_mps: 4.5       # ~10 mph
+      wind_direction_deg: 180.0 # direction wind is coming FROM
+      temperature_k: 291.0      # ~64 F
+      pressure_pa: 101325.0
+    # Dispersion for Monte Carlo (see uncertainty.yaml for the full set)
+    wind_speed_sigma_mps: 2.2
+    wind_direction_sigma_deg: 35.0
+
+  home_field:
+    name: "REPLACE - home launch field for subscale / demo flights"
+    latitude: 35.0
+    longitude: -86.0
+    elevation_m: 200.0
+    rail_length_m: 3.66
+    nominal:
+      wind_speed_mps: 4.0
+      wind_direction_deg: 0.0
+      temperature_k: 288.15
+      pressure_pa: 101325.0
+    wind_speed_sigma_mps: 2.0
+    wind_direction_sigma_deg: 40.0

@@ -1,0 +1,117 @@
+# =============================================================================
+#  FULL-SCALE VEHICLE SPECIFICATION  --  *** PLACEHOLDER TEMPLATE ***
+# =============================================================================
+#  Every number below is a REPRESENTATIVE USLI-class value, not a design.
+#  Replace them as the 2026-2027 design matures.  This one file is the single
+#  source of truth: it generates BOTH the OpenRocket .ork and the RocketPy
+#  model, so the two tools can never silently drift apart.
+#
+#  Units are imperial (in / lb / ft) to match the handbook and how the team
+#  will think about the vehicle.  Conversion to SI happens in slisim.units.
+# =============================================================================
+
+name: "Template Full-Scale"
+team: "REPLACE-WITH-TEAM-NAME"
+season: "2026-2027"
+status: "PLACEHOLDER - not a real design"
+
+# --- Airframe ---------------------------------------------------------------
+airframe:
+  outer_diameter_in: 6.00     # 6" is typical when an internal rover payload
+                              # needs volume; 4" scores better on mass (2.21)
+  wall_thickness_in: 0.125    # Blue Tube / fiberglass typical
+  surface_finish: regular_paint   # smooth | regular_paint | unfinished | rough
+
+# --- Nose cone --------------------------------------------------------------
+nose_cone:
+  shape: ogive                # ogive | conical | ellipsoid | haack | parabolic | power
+  shape_parameter: 1.0        # 1.0 = tangent ogive; for haack 0.0=LD-Haack/VonKarman
+  length_in: 26.0             # ~4.3 calibers
+  wall_thickness_in: 0.125
+  shoulder_length_in: 3.5     # req 2.5.3: >= 0.5 body diameter (3.0" here)
+  mass_lb: 2.40               # measured/override mass incl. tip & hardware
+
+# --- Body sections, nose-to-tail (excluding the nose cone) -------------------
+#  `mass_lb` is the AS-BUILT section mass: airframe + everything permanently
+#  inside it (bulkheads, sled, payload, hardware) but NOT parachutes, shock
+#  cord, or motor -- those are declared separately so the FRR kinetic-energy
+#  bookkeeping in section V balances exactly.
+sections:
+  - name: "Payload Bay"
+    length_in: 26.0
+    mass_lb: 7.80             # airframe + rover payload + retention
+  - name: "Avionics Bay"
+    length_in: 13.0           # coupler-based; req 2.5.1 needs >= 2 diameters
+    mass_lb: 4.60             # sled, 2x altimeter, batteries, switches
+  - name: "Booster"
+    length_in: 38.0
+    mass_lb: 9.20             # airframe, fin can, motor retainer, centering rings
+
+# --- Fins -------------------------------------------------------------------
+fins:
+  count: 3
+  root_chord_in: 15.0
+  tip_chord_in: 6.00
+  sweep_in: 6.00              # axial sweep distance of the leading edge
+  height_in: 7.50             # semi-span; sized for >= 2.0 cal (req 2.11)
+  thickness_in: 0.1875        # 3/16" G10
+  cant_deg: 0.0
+  offset_from_aft_in: 0.50    # fin trailing edge forward of the aft airframe end
+  mass_lb: 3.20               # total for the whole fin can (all fins)
+
+# --- Rail buttons -----------------------------------------------------------
+rail_guide:
+  type: rail_button
+  rail_size_in: 1.5           # 1515 rail
+
+# --- Motor ------------------------------------------------------------------
+#  `search` is matched against the OpenRocket thrust-curve database (1088 motor
+#  sets ship inside the .jar).  Run `python scripts/list_motors.py L` to browse.
+motor:
+  search: "L1520T"            # AeroTech L1520T, on the NASA-supported list (2.7)
+  manufacturer: "AeroTech"
+  mount_inner_diameter_in: 2.953   # 75 mm
+  mount_length_in: 24.0
+  overhang_in: 0.25
+  ignition_delay_s: 0.0
+
+# --- Recovery ---------------------------------------------------------------
+#  Two-stage per req 3.1.  Drogue at apogee, main low, motor ejection banned
+#  (3.1.3) so both events are altimeter-fired.
+recovery:
+  drogue:
+    name: "Drogue"
+    diameter_in: 18.0
+    cd: 1.55
+    deploy_event: apogee
+    deploy_delay_s: 1.0       # req 3.1.2: <= 2.0 s
+    mass_lb: 0.45
+  main:
+    name: "Main"
+    diameter_in: 108.0
+    cd: 2.20
+    deploy_event: altitude
+    deploy_altitude_ft: 600.0 # req 3.1.1: >= 500 ft
+    mass_lb: 2.60
+  shock_cord_mass_lb: 1.35    # total, all harnesses
+
+# --- Independent sections at landing (req 3.2, KE <= 75 ft-lbf each) ---------
+#  These must partition the landing mass.  `slisim.requirements` asserts that
+#  sum(sections) + propellant + chutes + cord == gross lift-off mass, which is
+#  exactly the bookkeeping the FRR asks for in section V.
+landing_sections:
+  - name: "Nose + Payload Bay"
+    members: ["nose_cone", "Payload Bay"]
+  - name: "Avionics Bay + Booster"
+    members: ["Avionics Bay", "Booster", "fins"]
+
+# --- Ballast (req 2.20.7) ---------------------------------------------------
+#  2.20.7.4 requires EVERY requirement to be met at BOTH extremes, so the
+#  framework runs min and max as two separate configurations.
+ballast:
+  min_lb: 0.0
+  max_lb: 3.00               # must be <= 10% of un-ballasted on-pad mass
+  location: "Payload Bay"    # section name the ballast mass is added to
+
+# --- Declared target (req 2.3, set at CDR) ----------------------------------
+target_apogee_ft: 4500.0    # nominal sim lands ~4490 ft; ballast trims it
