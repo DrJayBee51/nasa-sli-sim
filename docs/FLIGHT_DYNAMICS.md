@@ -109,8 +109,9 @@ of weathercocking (§10).
 Every aerodynamic force scales with $\rho$. Apogee is roughly set by how much
 kinetic energy survives the drag integral $\int C_D \tfrac12 \rho V^2 A\,dx$, so
 a 5% density error is roughly a 5% drag error. The framework's sensitivity
-analysis ranks launch-day **temperature** as the third-strongest driver of
-apogee (Spearman ρ ≈ 0.40) purely through its effect on density.
+analysis picks this up directly: launch-day **temperature** registers a
+measurable pull on apogee (Spearman ρ ≈ +0.10 over 1,000 cases) purely
+through its effect on density, with no other path to the trajectory.
 
 ## 2.2 Working equations — the ISA troposphere
 
@@ -398,8 +399,10 @@ a reviewer asks.
 
 # 5. Drag
 
-Drag sets apogee, and drag uncertainty is the single largest contributor to
-apogee scatter (Spearman ρ ≈ −0.6 to −0.8). It deserves the attention.
+Drag sets apogee, and drag uncertainty is — alongside motor impulse — one of
+the two dominant contributors to apogee scatter (Spearman ρ ≈ −0.53, against
+motor impulse's +0.61). It is the one of the two a team can actually reduce,
+which is why it deserves the attention.
 
 ## 5.1 Decomposition
 
@@ -930,9 +933,9 @@ $$V_{t,\text{main}} = \sqrt{\frac{2(16.18)(9.807)}{1.225 \times 13.00}}
 
 | Case | Hand calculation | Simulation | Agreement |
 |---|---|---|---|
-| Main, $\rho$ = 1.225 (sea level) | 14.64 fps | **14.60 fps** | 0.3% |
+| Main, $\rho$ = 1.225 (sea level) | 14.64 fps | **14.61 fps** | 0.2% |
 | Drogue, $\rho$ = 1.225 | 104.68 fps | — | |
-| Drogue, $\rho$ = 1.16 (≈1,500 m) | 107.57 fps | **108.73 fps** | 1.1% |
+| Drogue, $\rho$ = 1.16 (≈1,500 m) | 107.57 fps | **108.72 fps** | 1.1% |
 
 The main matches sea-level density because the main phase happens near the
 ground. The drogue matches the *reduced* density at altitude, because drogue
@@ -1215,19 +1218,44 @@ Spearman rather than Pearson because it detects any *monotone* relationship, not
 just a linear one — wind speed's effect on drift is monotone but not linear, and
 Pearson would understate it.
 
-Template, apogee:
+Template vehicle, 1,000 cases, seed 12345:
 
-| Input | Spearman ρ |
-|---|---:|
-| `drag_coefficient` | **−0.613** |
-| `motor_total_impulse` | **+0.573** |
-| `temperature_k` | +0.400 |
-| `dry_mass` | −0.324 |
-| `main_cd` | +0.204 |
-| `motor_burn_time` | +0.055 |
+| Input | ρ vs apogee | ρ vs drift | ρ vs landing speed |
+|---|---:|---:|---:|
+| `motor_total_impulse` | **+0.605** | −0.007 | +0.006 |
+| `drag_coefficient` | **−0.528** | −0.059 | −0.012 |
+| `dry_mass` | −0.267 | −0.000 | +0.108 |
+| `wind_speed_mps` | −0.226 | −0.015 | +0.011 |
+| `rail_angle_deg` | −0.159 | **+0.829** | −0.009 |
+| `temperature_k` | +0.098 | +0.032 | +0.179 |
+| `pressure_pa` | −0.072 | −0.014 | −0.105 |
+| `motor_burn_time` | −0.054 | −0.038 | +0.008 |
+| `cg_shift` | +0.053 | −0.018 | −0.077 |
+| `main_cd` | −0.010 | +0.019 | **−0.965** |
 
-Read it as a priority list. Drag and total impulse dominate; there is no point
-agonising over a quarter-pound of mass while carrying a 7% drag uncertainty.
+Read it as a priority list, and read all three columns — **the dominant driver is
+different for every question you ask.** Apogee is a motor-and-drag problem.
+Drift is almost entirely a rail-angle problem, and the rail angle is set by the
+RSO on the day rather than chosen by the team. Landing speed — and therefore
+kinetic energy at touchdown, requirement 3.2 — is a main-parachute problem and
+essentially nothing else.
+
+So there is no point agonising over a quarter-pound of mass while carrying a 7%
+drag uncertainty, and no point tuning drag at all if the question you are asking
+is about landing energy.
+
+### Sample size is not optional here
+
+These figures come from 1,000 cases because smaller runs give *misleading*
+rankings, not merely noisier ones. Development runs of 60 to 200 cases put
+`temperature_k` third at ρ ≈ +0.40; at 1,000 cases it settles at +0.10. The
+small-sample value was sampling noise wearing the costume of a physical effect,
+and a team acting on it would have gone off chasing the wrong variable.
+
+A rank correlation is an estimate like any other, with error falling as 1/√N.
+Quote sensitivities from a run of at least 1,000, state the sample size and seed
+beside them, and be suspicious of any ranking that reorders when you change
+either.
 
 Two sanity checks that this analysis is working correctly:
 

@@ -499,17 +499,26 @@ Requirement 2.3 scores you on closeness to the altitude you declare at CDR. The
 best declaration is therefore the **centre of your predicted distribution** —
 not the nominal run, and not the middle of the legal window.
 
-**Sensitivity** — what actually drives apogee:
+**Sensitivity** — what actually drives apogee (1,000 cases, seed 12345):
 
 ```
-| drag_coefficient    | -0.613 |
-| motor_total_impulse |  0.573 |
-| temperature_k       |  0.400 |
-| dry_mass            | -0.324 |
+| motor_total_impulse |  0.605 |
+| drag_coefficient    | -0.528 |
+| dry_mass            | -0.267 |
+| wind_speed_mps      | -0.226 |
+| rail_angle_deg      | -0.159 |
+| temperature_k       |  0.098 |
 ```
 
-Spearman rank correlation. Drag dominates. That single fact tells you where to
-spend effort: measuring drag from flight data is worth more than shaving grams.
+Spearman rank correlation. Motor impulse and drag dominate — and of those two,
+motor scatter is fixed at the factory while drag is something you can measure.
+That is where the effort belongs: fitting drag from flight data is worth more
+than shaving grams.
+
+Run this at **1,000 cases or more before you quote it**. At 60–200 cases the
+ranking is not just noisier, it is wrong — development runs put `temperature_k`
+third at 0.40, where 1,000 cases settle it at 0.10. Always record the sample
+size and seed next to any sensitivity number you publish.
 
 ## 3.6 Post-flight analysis, before you have a flight
 

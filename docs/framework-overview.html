@@ -1,0 +1,947 @@
+<title>Two Engines, One Rocket</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  /* ---- tokens: complete light palette on bare :root ---- */
+  :root {
+    --ground:    #EDF0F3;
+    --surface:   #FFFFFF;
+    --surface-2: #F4F7F9;
+    --board:     #F8FAFB;
+    --ink:       #141B22;
+    --ink-2:     #55626F;
+    --ink-3:     #7C8996;
+    --rule:      #D3DAE1;
+    --rule-soft: #E3E8ED;
+    --or:        #1D5B79;
+    --or-fill:   #E7F0F5;
+    --rp:        #5B4B8A;
+    --rp-fill:   #EEEAF6;
+    --data:      #A9660B;
+    --data-fill: #FAF0DF;
+    --grid:      #DCE3E9;
+    --bar:       #93A1AE;
+    --bar-lead:  #2C3E4E;
+
+    --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --f-body:    "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono:    "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
+    --measure: 66ch;
+    --pad: clamp(20px, 4vw, 56px);
+  }
+
+  /* system-dark (nothing stamped) — redefine tokens only */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #0D1318;
+      --surface:   #151D25;
+      --surface-2: #1A232C;
+      --board:     #121A21;
+      --ink:       #DFE7EE;
+      --ink-2:     #93A1AF;
+      --ink-3:     #74828F;
+      --rule:      #2A353F;
+      --rule-soft: #1F2831;
+      --or:        #6DB4D8;
+      --or-fill:   #16303E;
+      --rp:        #A897DF;
+      --rp-fill:   #251F3A;
+      --data:      #E3A74B;
+      --data-fill: #33260F;
+      --grid:      #1B242C;
+      --bar:       #5A6875;
+      --bar-lead:  #BCCBD8;
+    }
+  }
+  /* explicit dark choice wins in both directions */
+  :root[data-theme="dark"] {
+    --ground:    #0D1318;
+    --surface:   #151D25;
+    --surface-2: #1A232C;
+    --board:     #121A21;
+    --ink:       #DFE7EE;
+    --ink-2:     #93A1AF;
+    --ink-3:     #74828F;
+    --rule:      #2A353F;
+    --rule-soft: #1F2831;
+    --or:        #6DB4D8;
+    --or-fill:   #16303E;
+    --rp:        #A897DF;
+    --rp-fill:   #251F3A;
+    --data:      #E3A74B;
+    --data-fill: #33260F;
+    --grid:      #1B242C;
+    --bar:       #5A6875;
+    --bar-lead:  #BCCBD8;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 var(--pad) 96px; }
+
+  /* ---------- masthead ---------- */
+  .mast { padding: clamp(36px, 6vw, 72px) 0 28px; }
+
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  h1 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(38px, 6.4vw, 68px);
+    line-height: 1.02;
+    letter-spacing: -0.028em;
+    margin: 14px 0 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    max-width: var(--measure);
+    margin: 20px 0 0;
+    font-size: clamp(17px, 2vw, 19.5px);
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- stat strip ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    margin-top: 36px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .stat { background: var(--surface); padding: 18px 20px; }
+  .stat b {
+    display: block;
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 30px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat span {
+    display: block;
+    margin-top: 5px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--ink-2);
+  }
+  .stat.is-or b { color: var(--or); }
+  .stat.is-rp b { color: var(--rp); }
+  .stat.is-data b { color: var(--data); }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 64px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 26px;
+  }
+  h2 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: clamp(21px, 2.6vw, 27px);
+    letter-spacing: -0.018em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .sec-head .eyebrow { margin-left: auto; white-space: nowrap; }
+
+  p { max-width: var(--measure); margin: 0 0 16px; }
+  p.lead { font-size: 17.5px; color: var(--ink-2); }
+  .note { color: var(--ink-2); font-size: 15px; }
+  b, strong { font-weight: 600; }
+
+  /* ---------- diagram board ---------- */
+  figure { margin: 0; }
+  .board {
+    background: var(--board);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 10px;
+    overflow-x: auto;
+  }
+  .board svg { display: block; width: 100%; min-width: 940px; height: auto; }
+  figcaption {
+    margin-top: 14px;
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: var(--measure);
+  }
+
+  /* svg classes (styled here — no <style> inside the svg) */
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .blk       { fill: var(--surface); stroke: var(--rule); stroke-width: 1.25; }
+  .blk-or    { fill: var(--or-fill); stroke: var(--or); stroke-width: 1.75; }
+  .blk-rp    { fill: var(--rp-fill); stroke: var(--rp); stroke-width: 1.75; }
+  .blk-data  { fill: var(--data-fill); stroke: var(--data); stroke-width: 1.75; }
+  .blk-audit { fill: var(--surface-2); stroke: var(--ink-2); stroke-width: 1.5; }
+
+  .ln     { fill: none; stroke: var(--ink-3); stroke-width: 1.4; }
+  .ln-or  { fill: none; stroke: var(--or); stroke-width: 2; }
+  .ln-rp  { fill: none; stroke: var(--rp); stroke-width: 2; }
+  .ln-data{ fill: none; stroke: var(--data); stroke-width: 2; stroke-dasharray: 7 5; }
+
+  .ah-n    { fill: var(--ink-3); }
+  .ah-or   { fill: var(--or); }
+  .ah-rp   { fill: var(--rp); }
+  .ah-data { fill: var(--data); }
+  .node    { fill: var(--ink-3); }
+
+  .t-title { font-family: var(--f-display); font-weight: 600; font-size: 19px; fill: var(--ink); letter-spacing: -0.01em; }
+  .t-body  { font-family: var(--f-body); font-size: 13.5px; fill: var(--ink-2); }
+  .t-chip  { font-family: var(--f-body); font-size: 13.5px; font-weight: 500; fill: var(--ink); }
+  .t-eye   { font-family: var(--f-mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.14em; fill: var(--ink-3); }
+  .t-pass  { font-family: var(--f-mono); font-size: 13px; fill: var(--ink); }
+  .t-loop  { font-family: var(--f-mono); font-size: 12.5px; fill: var(--data); }
+  .e-or    { fill: var(--or); }
+  .e-rp    { fill: var(--rp); }
+  .e-data  { fill: var(--data); }
+
+  /* ---------- shared / independent ---------- */
+  .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px; }
+  .col-head {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding-bottom: 9px;
+    margin-bottom: 4px;
+    border-bottom: 2px solid currentColor;
+  }
+  .col-head.ind { color: var(--or); }
+  .col-head.shr { color: var(--data); }
+  ul.plain { list-style: none; margin: 0; padding: 0; }
+  ul.plain li {
+    display: flex;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  ul.plain li i {
+    flex: 0 0 auto;
+    font-style: normal;
+    font-family: var(--f-mono);
+    font-size: 13px;
+    color: var(--ink-3);
+    padding-top: 1px;
+  }
+  ul.plain li em { font-style: normal; color: var(--ink-2); }
+
+  .punch {
+    margin-top: 26px;
+    padding: 18px 22px;
+    background: var(--surface);
+    border-left: 3px solid var(--data);
+    border-radius: 0 3px 3px 0;
+  }
+  .punch p { margin: 0; font-size: 16px; }
+
+  /* ---------- dispersions ---------- */
+  .disp { display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); gap: 26px 34px; }
+  .dgroup h3 {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .drow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .drow .dn { font-size: 15px; font-weight: 500; }
+  .drow .dv {
+    font-family: var(--f-mono);
+    font-size: 13px;
+    color: var(--or);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .drow .dw { grid-column: 1 / -1; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); }
+
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 18px;
+    margin: 0 0 30px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-size: 15px;
+  }
+  .flow b { font-family: var(--f-display); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .flow .arw { color: var(--ink-3); font-family: var(--f-mono); }
+  .flow span em { font-style: normal; color: var(--ink-2); display: block; font-size: 13px; }
+
+  /* ---------- sensitivity small multiples ---------- */
+  .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 30px; }
+  .panel { min-width: 0; }
+  .panel h3 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 16.5px;
+    margin: 0 0 3px;
+    letter-spacing: -0.01em;
+  }
+  .panel .sub { font-size: 13.5px; color: var(--ink-2); margin: 0 0 14px; }
+  .srow {
+    display: grid;
+    grid-template-columns: minmax(88px, 34%) 1fr 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+  }
+  .srow:hover .sbar { filter: brightness(1.12); }
+  .slab { font-size: 13.5px; line-height: 1.25; }
+  .sval {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    text-align: right;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .strack {
+    position: relative;
+    height: 15px;
+    background: var(--surface-2);
+    border-radius: 2px;
+  }
+  .strack::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: -2px; bottom: -2px;
+    width: 1px;
+    background: var(--rule);
+  }
+  .sbar {
+    position: absolute;
+    top: 3px; bottom: 3px;
+    background: var(--bar);
+    border-radius: 2px;
+  }
+  .sbar.lead { background: var(--bar-lead); }
+  .saxis {
+    display: grid;
+    grid-template-columns: minmax(88px, 34%) 1fr 44px;
+    gap: 10px;
+    margin-top: 7px;
+    font-family: var(--f-mono);
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+  .saxis .ticks { display: flex; justify-content: space-between; }
+
+  /* ---------- outputs ---------- */
+  .outs { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+  .out {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .out h3 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 17px;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .out p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .out .answers {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule-soft);
+    font-family: var(--f-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  /* ---------- requirements ---------- */
+  .reqs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .req {
+    background: var(--surface);
+    padding: 12px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    font-size: 14.5px;
+  }
+  .req code {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    color: var(--or);
+    flex: 0 0 52px;
+    font-variant-numeric: tabular-nums;
+  }
+  .req.frr code { color: var(--data); }
+
+  /* ---------- close ---------- */
+  .close {
+    margin-top: 64px;
+    padding-top: 26px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px 40px;
+    align-items: baseline;
+  }
+  .close p { margin: 0; font-size: 14.5px; color: var(--ink-2); max-width: 46ch; }
+  .close .eyebrow { flex: 1 0 100%; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a, .out { transition: border-color .18s ease; }
+  }
+  :focus-visible { outline: 2px solid var(--or); outline-offset: 3px; border-radius: 2px; }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="eyebrow">NASA Student Launch · 2026–2027 · Vehicle Simulation</div>
+    <h1>Two engines,<br>one rocket.</h1>
+    <p class="standfirst">
+      We simulate every flight twice — once in <strong>OpenRocket</strong>, once in
+      <strong>RocketPy</strong> — from a single vehicle definition. One gives us the flight
+      we expect. The other gives us the <strong>thousand flights we might actually get</strong>.
+      Then we go fly, and the real data corrects them both.
+    </p>
+
+    <div class="stats">
+      <div class="stat is-or">
+        <b>0.07%</b>
+        <span>Apogee disagreement between the two engines</span>
+      </div>
+      <div class="stat is-rp">
+        <b>1,000</b>
+        <span>Dispersed flights in a single Monte&nbsp;Carlo run</span>
+      </div>
+      <div class="stat is-data">
+        <b>99.0%</b>
+        <span>Of those flights land inside the required window</span>
+      </div>
+      <div class="stat">
+        <b>15</b>
+        <span>USLI requirements checked automatically, every run</span>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <h2>How the pieces fit together</h2>
+      <span class="eyebrow">Information flow</span>
+    </div>
+
+    <figure>
+      <div class="board">
+        <svg viewBox="0 0 1240 960" role="img"
+             aria-label="Block diagram: airframe geometry, as-built masses and a motor thrust curve feed OpenRocket; uncertainty distributions and a sample count feed RocketPy; launch site conditions feed both. OpenRocket passes its thrust curve, mass properties and drag coefficient to RocketPy. OpenRocket produces one nominal flight, RocketPy produces a distribution, and both feed a cross-check and requirement audit. That leads to a subscale flight and a full-scale demonstration flight, whose measured data loops back to correct the drag model and shrink the uncertainty bands.">
+
+          <defs>
+            <pattern id="plot" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M40 0H0V40" class="grid-line" fill="none"/>
+            </pattern>
+            <marker id="ahn" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" class="ah-n"/>
+            </marker>
+            <marker id="ahor" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" class="ah-or"/>
+            </marker>
+            <marker id="ahrp" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" class="ah-rp"/>
+            </marker>
+            <marker id="ahd" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,1 10,5 0,9" class="ah-data"/>
+            </marker>
+          </defs>
+
+          <rect x="0" y="0" width="1240" height="960" fill="url(#plot)" opacity="0.55"/>
+
+          <!-- ============ INPUT ROW ============ -->
+          <text x="96" y="146" class="t-eye">WHAT WE PUT IN</text>
+
+          <!-- engine-specific inputs, left -->
+          <rect x="96"  y="172" width="118" height="58" rx="3" class="blk"/>
+          <text x="155" y="206" class="t-chip" text-anchor="middle">Airframe geometry</text>
+          <rect x="228" y="172" width="118" height="58" rx="3" class="blk"/>
+          <text x="287" y="206" class="t-chip" text-anchor="middle">As-built masses</text>
+          <rect x="360" y="172" width="118" height="58" rx="3" class="blk"/>
+          <text x="419" y="199" class="t-chip" text-anchor="middle">Motor thrust</text>
+          <text x="419" y="216" class="t-chip" text-anchor="middle">curve</text>
+
+          <!-- shared input, centre -->
+          <rect x="506" y="172" width="228" height="58" rx="3" class="blk"/>
+          <text x="620" y="199" class="t-chip" text-anchor="middle">Launch site · wind</text>
+          <text x="620" y="216" class="t-chip" text-anchor="middle">temperature · pressure</text>
+
+          <!-- engine-specific inputs, right -->
+          <rect x="788" y="172" width="170" height="58" rx="3" class="blk"/>
+          <text x="873" y="199" class="t-chip" text-anchor="middle">How well we know</text>
+          <text x="873" y="216" class="t-chip" text-anchor="middle">each number</text>
+          <rect x="974" y="172" width="170" height="58" rx="3" class="blk"/>
+          <text x="1059" y="199" class="t-chip" text-anchor="middle">How many flights</text>
+          <text x="1059" y="216" class="t-chip" text-anchor="middle">to simulate</text>
+
+          <!-- left bus -->
+          <path d="M155 230V252 M287 230V252 M419 230V252 M155 252H419" class="ln"/>
+          <path d="M200 252V286" class="ln" marker-end="url(#ahn)"/>
+          <circle cx="200" cy="252" r="3" class="node"/>
+
+          <!-- right bus -->
+          <path d="M873 230V252 M1059 230V252 M873 252H1059" class="ln"/>
+          <path d="M1040 252V286" class="ln" marker-end="url(#ahn)"/>
+          <circle cx="1040" cy="252" r="3" class="node"/>
+
+          <!-- shared input splits to both engines -->
+          <path d="M570 230V272H440V286" class="ln" marker-end="url(#ahn)"/>
+          <path d="M670 230V272H800V286" class="ln" marker-end="url(#ahn)"/>
+
+          <!-- ============ ENGINES ============ -->
+          <rect x="96" y="292" width="380" height="178" rx="3" class="blk-or"/>
+          <text x="120" y="322" class="t-eye e-or">DESIGN ENGINE</text>
+          <text x="120" y="352" class="t-title">OpenRocket 24.12</text>
+          <text x="120" y="384" class="t-body">Barrowman aerodynamics</text>
+          <text x="120" y="406" class="t-body">RK4 six-degree-of-freedom ascent</text>
+          <text x="120" y="428" class="t-body">Works out the drag from the shape</text>
+          <text x="120" y="452" class="t-body">One flight, ~0.7 seconds</text>
+
+          <rect x="764" y="292" width="380" height="178" rx="3" class="blk-rp"/>
+          <text x="788" y="322" class="t-eye e-rp">DISPERSION ENGINE</text>
+          <text x="788" y="352" class="t-title">RocketPy 1.13</text>
+          <text x="788" y="384" class="t-body">Diederich fin aerodynamics</text>
+          <text x="788" y="406" class="t-body">LSODA adaptive six-DOF</text>
+          <text x="788" y="428" class="t-body">Cannot work out drag by itself</text>
+          <text x="788" y="452" class="t-body">A thousand flights, a few minutes</text>
+
+          <!-- what passes between them -->
+          <text x="620" y="322" class="t-eye" text-anchor="middle">HANDED ACROSS</text>
+          <text x="620" y="350" class="t-pass" text-anchor="middle">thrust curve</text>
+          <text x="620" y="372" class="t-pass" text-anchor="middle">mass · CG · inertia</text>
+          <text x="620" y="394" class="t-pass" text-anchor="middle">drag coefficient Cd(M)</text>
+          <path d="M480 428H758" class="ln-or" marker-end="url(#ahor)"/>
+
+          <!-- ============ OUTPUTS ============ -->
+          <text x="96" y="510" class="t-eye">WHAT COMES OUT</text>
+
+          <path d="M286 470V526" class="ln-or" marker-end="url(#ahor)"/>
+          <rect x="96" y="532" width="380" height="80" rx="3" class="blk"/>
+          <text x="120" y="562" class="t-title">One flight we expect</text>
+          <text x="120" y="590" class="t-body">Trajectory · stability · structural loads</text>
+
+          <path d="M954 470V526" class="ln-rp" marker-end="url(#ahrp)"/>
+          <rect x="764" y="532" width="380" height="80" rx="3" class="blk"/>
+          <text x="788" y="562" class="t-title">A spread of outcomes</text>
+          <text x="788" y="590" class="t-body">Apogee range · landing ellipse · odds of passing</text>
+
+          <!-- converge to audit -->
+          <path d="M286 612V648H470V678" class="ln" marker-end="url(#ahn)"/>
+          <path d="M954 612V648H770V678" class="ln" marker-end="url(#ahn)"/>
+
+          <rect x="420" y="684" width="400" height="82" rx="3" class="blk-audit"/>
+          <text x="620" y="716" class="t-title" text-anchor="middle">Do they agree? Does it comply?</text>
+          <text x="620" y="742" class="t-body" text-anchor="middle">Cross-check · 15 USLI requirement checks</text>
+
+          <!-- ============ FLY ============ -->
+          <path d="M620 766V800" class="ln" marker-end="url(#ahn)"/>
+          <path d="M465 800H775" class="ln"/>
+          <path d="M465 800V816" class="ln" marker-end="url(#ahd)"/>
+          <path d="M775 800V816" class="ln" marker-end="url(#ahd)"/>
+          <circle cx="620" cy="800" r="3" class="node"/>
+
+          <rect x="330" y="822" width="270" height="76" rx="3" class="blk-data"/>
+          <text x="465" y="854" class="t-title" text-anchor="middle">Subscale flight</text>
+          <text x="465" y="878" class="t-body" text-anchor="middle">proves the method works</text>
+
+          <rect x="640" y="822" width="270" height="76" rx="3" class="blk-data"/>
+          <text x="775" y="854" class="t-title" text-anchor="middle">Full-scale demo flight</text>
+          <text x="775" y="878" class="t-body" text-anchor="middle">measures the real drag</text>
+
+          <!-- ============ THE LOOP BACK ============ -->
+          <path d="M465 898V928 M775 898V928 M465 928H775" class="ln-data"/>
+          <circle cx="620" cy="928" r="3.5" class="ah-data"/>
+
+          <!-- left return: corrects the model -->
+          <path d="M465 928H36V201H90" class="ln-data" marker-end="url(#ahd)"/>
+          <!-- right return: shrinks the uncertainty -->
+          <path d="M775 928H1204V201H1150" class="ln-data" marker-end="url(#ahd)"/>
+
+          <text class="t-loop" text-anchor="middle" transform="translate(24 565) rotate(-90)">
+            measured drag corrects the model
+          </text>
+          <text class="t-loop" text-anchor="middle" transform="translate(1216 565) rotate(-90)">
+            measured spread narrows the guesswork
+          </text>
+        </svg>
+      </div>
+      <figcaption>
+        Everything starts from one vehicle definition. OpenRocket hands RocketPy the three
+        things RocketPy cannot work out for itself, so the two models can never describe
+        different rockets. The dashed amber path is the part that matters most: flight data
+        is the only thing in the whole diagram that comes from reality rather than from us.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Why run two simulators at all?</h2>
+      <span class="eyebrow">The honest version</span>
+    </div>
+
+    <p class="lead">
+      Because the handbook asks us to — and because it makes our numbers harder to argue with.
+      Mission Performance Predictions, repeated in the PDR, CDR and FRR, asks teams to
+      <em>“present data from a different calculation method,”</em> to
+      <em>“discuss any differences,”</em> and to <em>“perform multiple simulations to verify
+      that results are precise.”</em>
+    </p>
+    <p>
+      Most teams answer that last one by running OpenRocket five times with different wind
+      speeds. That shows the software is repeatable. It says nothing about whether the
+      <em>rocket</em> is. We answer it by admitting what we don't know, sampling it a thousand
+      times, and reporting the odds.
+    </p>
+
+    <div class="split" style="margin-top:32px">
+      <div>
+        <div class="col-head ind">Genuinely independent</div>
+        <ul class="plain">
+          <li><i>01</i><span>Flight dynamics — <em>two different integrators solving two different formulations</em></span></li>
+          <li><i>02</i><span>Centre of pressure — <em>each works it out from its own description of the rocket</em></span></li>
+          <li><i>03</i><span>Fin lift — <em>Barrowman versus Diederich; genuinely different theories</em></span></li>
+          <li><i>04</i><span>Atmosphere, wind and event detection</span></li>
+          <li><i>05</i><span>Descent solver — <em>different schemes entirely</em></span></li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-head shr">Shared, by design</div>
+        <ul class="plain">
+          <li><i>—</i><span>The motor thrust curve</span></li>
+          <li><i>—</i><span>Mass, centre of gravity and inertia</span></li>
+          <li><i>—</i><span><strong>The drag coefficient</strong> — <em>RocketPy has no drag model of its own; it has to be told</em></span></li>
+        </ul>
+        <div class="punch">
+          <p>
+            So the two engines agreeing does <strong>not</strong> prove our drag estimate is
+            right. If OpenRocket is 15% low, both are 15% low together — and they agree
+            beautifully while both being wrong. That is exactly why we fly, and why the
+            amber loop exists.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>What we admit we don't know</h2>
+      <span class="eyebrow">The dispersions</span>
+    </div>
+
+    <p class="lead">
+      A single simulation answers “what happens if every number is exactly right?” — a flight
+      that will never occur. So before we run anything, we write down every quantity we're
+      unsure about and how unsure we are. Those sixteen numbers are the honest part of the
+      model, and they're worth more scrutiny than the simulation itself.
+    </p>
+
+    <div class="flow">
+      <span><b>16</b><em>declared uncertainties</em></span>
+      <span class="arw">→</span>
+      <span><b>1,000</b><em>sampled flights</em></span>
+      <span class="arw">→</span>
+      <span><b>±196 ft</b><em>apogee, one sigma</em></span>
+      <span class="arw">→</span>
+      <span><b>99.0%</b><em>land inside the window</em></span>
+    </div>
+
+    <div class="disp">
+      <div class="dgroup">
+        <h3>The airframe</h3>
+        <div class="drow"><span class="dn">Dry mass</span><span class="dv">±1.5%</span>
+          <span class="dw">Epoxy, paint, wiring and fillets never weigh what the CAD said.</span></div>
+        <div class="drow"><span class="dn">CG position</span><span class="dv">±1 cm</span>
+          <span class="dw">Moves with build tolerance and where the payload actually sits.</span></div>
+        <div class="drow"><span class="dn">Drag coefficient</span><span class="dv">±7%</span>
+          <span class="dw">The big one, and the one we can shrink by flying.</span></div>
+      </div>
+
+      <div class="dgroup">
+        <h3>The motor</h3>
+        <div class="drow"><span class="dn">Total impulse</span><span class="dv">±2%</span>
+          <span class="dw">Batch-to-batch variation in the propellant. Nothing we can do about it.</span></div>
+        <div class="drow"><span class="dn">Burn time</span><span class="dv">±1.5%</span>
+          <span class="dw">Held independent of impulse, so the two don't double-count.</span></div>
+        <div class="drow"><span class="dn">Casing mass</span><span class="dv">±1%</span>
+          <span class="dw">Hardware tolerance, plus whatever residue stays after burn.</span></div>
+      </div>
+
+      <div class="dgroup">
+        <h3>Launch day</h3>
+        <div class="drow"><span class="dn">Wind speed</span><span class="dv">±2.2 m/s</span>
+          <span class="dw">Never below zero, never above 27 mph — past that the RSO scrubs.</span></div>
+        <div class="drow"><span class="dn">Wind direction</span><span class="dv">±35°</span>
+          <span class="dw">Around whatever the forecast says for the field that month.</span></div>
+        <div class="drow"><span class="dn">Rail angle</span><span class="dv">5° ± 1.5°</span>
+          <span class="dw">The RSO sets this on the day. We don't get to choose it.</span></div>
+        <div class="drow"><span class="dn">Rail heading</span><span class="dv">0–360°</span>
+          <span class="dw">Genuinely unknown relative to the wind, so it's drawn flat.</span></div>
+        <div class="drow"><span class="dn">Air temperature</span><span class="dv">±6 K</span>
+          <span class="dw">Changes air density, which changes every aerodynamic force.</span></div>
+        <div class="drow"><span class="dn">Air pressure</span><span class="dv">±900 Pa</span>
+          <span class="dw">Same story — density again.</span></div>
+      </div>
+
+      <div class="dgroup">
+        <h3>Recovery</h3>
+        <div class="drow"><span class="dn">Main parachute Cd</span><span class="dv">±10%</span>
+          <span class="dw">Canopy drag at this scale is genuinely poorly known.</span></div>
+        <div class="drow"><span class="dn">Drogue Cd</span><span class="dv">±10%</span>
+          <span class="dw">Worse, because the vehicle is half-tumbling under it.</span></div>
+        <div class="drow"><span class="dn">Main deploy altitude</span><span class="dv">±25 ft</span>
+          <span class="dw">Altimeter accuracy plus how the bay is vented.</span></div>
+        <div class="drow"><span class="dn">Drogue delay</span><span class="dv">±0.25 s</span>
+          <span class="dw">Bounded so the total can never break the 2-second rule.</span></div>
+      </div>
+    </div>
+
+    <h2 style="font-size:20px;margin:44px 0 6px">What actually moves the needle</h2>
+    <p class="note" style="margin-bottom:24px">
+      Rank correlation between each input and each result, over 1,000 flights. Longer bar =
+      stronger driver; left of the line means “more of this gives you less of that.”
+      <strong>The answer is different for every question we ask</strong> — which is the whole
+      reason we run this rather than guessing.
+    </p>
+
+    <div class="panels">
+
+      <div class="panel">
+        <h3>What moves the apogee</h3>
+        <p class="sub">Requirement 2.1 &amp; 2.3</p>
+        <div class="srow" title="Motor impulse vs apogee: rho = +0.605">
+          <span class="slab">Motor impulse</span>
+          <span class="strack"><i class="sbar lead" style="left:50%;width:30.3%"></i></span>
+          <span class="sval">+0.61</span></div>
+        <div class="srow" title="Drag coefficient vs apogee: rho = -0.528">
+          <span class="slab">Drag coefficient</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:26.4%"></i></span>
+          <span class="sval">−0.53</span></div>
+        <div class="srow" title="Dry mass vs apogee: rho = -0.267">
+          <span class="slab">Dry mass</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:13.4%"></i></span>
+          <span class="sval">−0.27</span></div>
+        <div class="srow" title="Wind speed vs apogee: rho = -0.226">
+          <span class="slab">Wind speed</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:11.3%"></i></span>
+          <span class="sval">−0.23</span></div>
+        <div class="srow" title="Rail angle vs apogee: rho = -0.159">
+          <span class="slab">Rail angle</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:8.0%"></i></span>
+          <span class="sval">−0.16</span></div>
+        <div class="srow" title="Air temperature vs apogee: rho = +0.098">
+          <span class="slab">Air temperature</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:4.9%"></i></span>
+          <span class="sval">+0.10</span></div>
+        <div class="saxis"><span></span><span class="ticks"><span>−1</span><span>0</span><span>+1</span></span><span></span></div>
+      </div>
+
+      <div class="panel">
+        <h3>What moves where it lands</h3>
+        <p class="sub">Requirement 3.10</p>
+        <div class="srow" title="Rail angle vs drift: rho = +0.829">
+          <span class="slab">Rail angle</span>
+          <span class="strack"><i class="sbar lead" style="left:50%;width:41.5%"></i></span>
+          <span class="sval">+0.83</span></div>
+        <div class="srow" title="Rail heading vs drift: rho = -0.085">
+          <span class="slab">Rail heading</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:4.3%"></i></span>
+          <span class="sval">−0.09</span></div>
+        <div class="srow" title="Wind direction vs drift: rho = +0.074">
+          <span class="slab">Wind direction</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:3.7%"></i></span>
+          <span class="sval">+0.07</span></div>
+        <div class="srow" title="Drag coefficient vs drift: rho = -0.059">
+          <span class="slab">Drag coefficient</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:3.0%"></i></span>
+          <span class="sval">−0.06</span></div>
+        <div class="srow" title="Burn time vs drift: rho = -0.038">
+          <span class="slab">Burn time</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:1.9%"></i></span>
+          <span class="sval">−0.04</span></div>
+        <div class="srow" title="Main deploy altitude vs drift: rho = +0.037">
+          <span class="slab">Main deploy alt.</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:1.9%"></i></span>
+          <span class="sval">+0.04</span></div>
+        <div class="saxis"><span></span><span class="ticks"><span>−1</span><span>0</span><span>+1</span></span><span></span></div>
+      </div>
+
+      <div class="panel">
+        <h3>What moves the landing speed</h3>
+        <p class="sub">Requirement 3.2 — kinetic energy</p>
+        <div class="srow" title="Main parachute Cd vs landing speed: rho = -0.965">
+          <span class="slab">Main chute Cd</span>
+          <span class="strack"><i class="sbar lead" style="right:50%;width:48.3%"></i></span>
+          <span class="sval">−0.97</span></div>
+        <div class="srow" title="Air temperature vs landing speed: rho = +0.179">
+          <span class="slab">Air temperature</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:9.0%"></i></span>
+          <span class="sval">+0.18</span></div>
+        <div class="srow" title="Dry mass vs landing speed: rho = +0.108">
+          <span class="slab">Dry mass</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:5.4%"></i></span>
+          <span class="sval">+0.11</span></div>
+        <div class="srow" title="Air pressure vs landing speed: rho = -0.105">
+          <span class="slab">Air pressure</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:5.3%"></i></span>
+          <span class="sval">−0.11</span></div>
+        <div class="srow" title="CG position vs landing speed: rho = -0.077">
+          <span class="slab">CG position</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:3.9%"></i></span>
+          <span class="sval">−0.08</span></div>
+        <div class="srow" title="Drogue Cd vs landing speed: rho = -0.022">
+          <span class="slab">Drogue Cd</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:1.1%"></i></span>
+          <span class="sval">−0.02</span></div>
+        <div class="saxis"><span></span><span class="ticks"><span>−1</span><span>0</span><span>+1</span></span><span></span></div>
+      </div>
+    </div>
+
+    <div class="punch" style="margin-top:30px">
+      <p>
+        Read those three panels together. Apogee is a <strong>motor and drag</strong> problem.
+        Where it lands is almost entirely a <strong>rail angle</strong> problem — a number the
+        range officer picks, not us. And landing speed is a <strong>parachute</strong> problem,
+        full stop. Three requirements, three different things to worry about.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>What we get out of it</h2>
+      <span class="eyebrow">Deliverables</span>
+    </div>
+
+    <div class="outs">
+      <div class="out">
+        <h3>An apogee we can defend</h3>
+        <p>Not “4,534 ft” but “4,440 ft, with 95% of cases between 4,068 and 4,818.”
+           The number we declare at CDR is the centre of that spread.</p>
+        <div class="answers">ANSWERS REQ 2.1 · REQ 2.3</div>
+      </div>
+      <div class="out">
+        <h3>A landing footprint</h3>
+        <p>A scatter of a thousand touchdown points against the 2,500 ft recovery
+           radius, instead of one lucky dot.</p>
+        <div class="answers">ANSWERS REQ 3.10 · REQ 3.11</div>
+      </div>
+      <div class="out">
+        <h3>A pass/fail audit</h3>
+        <p>Every requirement checked on every run, each one citing the handbook
+           paragraph it enforces. No hand-copied tables.</p>
+        <div class="answers">ANSWERS THE VERIFICATION MATRIX</div>
+      </div>
+      <div class="out">
+        <h3>A written comparison</h3>
+        <p>The two engines side by side, with every difference above 5% explained —
+           and anything unexplained flagged as unexplained.</p>
+        <div class="answers">ANSWERS “A DIFFERENT CALCULATION METHOD”</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Checked on every single run</h2>
+      <span class="eyebrow">USLI compliance</span>
+    </div>
+    <div class="reqs">
+      <div class="req"><code>2.1</code><span>Apogee between 4,000 and 6,000 ft AGL</span></div>
+      <div class="req"><code>2.3</code><span>Distance from the altitude we declared</span></div>
+      <div class="req"><code>2.9</code><span>Total impulse at or under 5,120 N·s</span></div>
+      <div class="req"><code>2.11</code><span>Static stability of at least 2.0 calibers</span></div>
+      <div class="req"><code>2.12</code><span>Thrust-to-weight of at least 5.0 to 1</span></div>
+      <div class="req"><code>2.14</code><span>At least 52 fps leaving the rail</span></div>
+      <div class="req"><code>2.20.6</code><span>Never exceeds Mach 1</span></div>
+      <div class="req"><code>2.20.7</code><span>Ballast under 10% of un-ballasted mass</span></div>
+      <div class="req"><code>2.21</code><span>Mass scoring band</span></div>
+      <div class="req"><code>3.1.1</code><span>Main parachute no lower than 500 ft</span></div>
+      <div class="req"><code>3.1.2</code><span>Apogee event delayed no more than 2 s</span></div>
+      <div class="req"><code>3.2</code><span>Under 75 ft·lbf landing energy, every section</span></div>
+      <div class="req"><code>3.10</code><span>Lands within 2,500 ft of the pad</span></div>
+      <div class="req"><code>3.11</code><span>Down within 100 s of apogee</span></div>
+      <div class="req frr"><code>FRR&nbsp;V</code><span>Mass budget adds up exactly</span></div>
+    </div>
+  </section>
+
+  <div class="close">
+    <span class="eyebrow">One thing to take away</span>
+    <p>
+      <strong>Two things dominate our apogee: the motor and the drag.</strong> We cannot do
+      anything about the motor — that scatter is baked in at the factory. Drag we can do
+      something about. Before we fly it's a 7% guess; after the demonstration flight it's a
+      2–3% measurement, and the apogee spread roughly halves.
+    </p>
+    <p>
+      So we don't improve our altitude score by simulating harder. We improve it by flying,
+      measuring, and feeding the answer back in.
+    </p>
+  </div>
+
+</div>

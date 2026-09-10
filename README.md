@@ -48,8 +48,10 @@ estimate is wrong. What RocketPy independently validates is everything the drag
 
 To break that last dependency, fit Cd against real flight data
 (`scripts/fit_cd.py`). That is also the single highest-value analysis here:
-drag is the dominant driver of apogee scatter (Spearman ρ ≈ −0.8), so replacing
-the pre-flight guess with a measured value substantially tightens the predicted
+drag and motor impulse are the two dominant drivers of apogee scatter (Spearman
+ρ ≈ −0.53 and +0.61 over 1,000 cases). Motor scatter is fixed at the factory;
+drag is the one of the two a team can actually shrink, so replacing the
+pre-flight guess with a measured value substantially tightens the predicted
 apogee — which is exactly what the req 2.3 altitude score pays out on.
 
 ---
