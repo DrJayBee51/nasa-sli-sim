@@ -30,7 +30,7 @@ dry_mass:
   sigma: 0.015
 
 cg_shift:
-  # Absolute shift of the dry CG, metres. Positive = aft. Drives stability.
+  # Absolute shift of the dry CG, meters. Positive = aft. Drives stability.
   distribution: normal
   mean: 0.0
   sigma: 0.010          # +/- 1 cm 1-sigma

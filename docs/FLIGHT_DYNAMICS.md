@@ -14,7 +14,7 @@ evaluates — and explains every term. Where a result is not obvious, a
 read the working equations alone as a reference during a report crunch, or read
 the derivations to understand where they come from.
 
-Numbers labelled *"template vehicle"* are real outputs from the framework for
+Numbers labeled *"template vehicle"* are real outputs from the framework for
 the placeholder design in `config/vehicle.yaml` (6.00 in diameter, 103 in long,
 39.58 lb on the pad, AeroTech L1520T). They are there so you can check your own
 understanding against something concrete, and so you can reproduce them.
@@ -23,7 +23,7 @@ Statements about OpenRocket's internals were verified directly against
 `OpenRocket-24.12.jar` — class structure by decompiling signatures, numerical
 correlations by evaluating them. Where a claim rests on OpenRocket's published
 technical documentation rather than direct verification, it says so. RocketPy's
-behaviour was read from the installed 1.13.0 source.
+behavior was read from the installed 1.13.0 source.
 
 The companion document, [`SETUP_AND_USER_GUIDE.md`](SETUP_AND_USER_GUIDE.md),
 covers installation and operation.
@@ -35,7 +35,7 @@ covers installation and operation.
 1. [Notation and coordinate systems](#1-notation-and-coordinate-systems)
 2. [The atmosphere](#2-the-atmosphere)
 3. [Forces on the vehicle](#3-forces-on-the-vehicle)
-4. [Normal force and centre of pressure](#4-normal-force-and-centre-of-pressure)
+4. [Normal force and center of pressure](#4-normal-force-and-center-of-pressure)
 5. [Drag](#5-drag)
 6. [Mass properties](#6-mass-properties)
 7. [Static stability](#7-static-stability)
@@ -65,7 +65,7 @@ covers installation and operation.
 | $d$ | body reference diameter (one caliber) | m |
 | $C_N$, $C_{N\alpha}$ | normal force coefficient and its slope | —, 1/rad |
 | $C_D$ | drag coefficient | — |
-| $X_\text{cp}$, $X_\text{cg}$ | centre of pressure / gravity, from nose tip | m |
+| $X_\text{cp}$, $X_\text{cg}$ | center of pressure / gravity, from nose tip | m |
 | $\mathcal{S}$ | static margin, in calibers | cal |
 | $I_L$, $I_R$ | longitudinal (pitch/yaw) and rotational (roll) inertia | kg·m² |
 | $\dot m$ | propellant mass flow rate | kg/s |
@@ -216,7 +216,7 @@ Template vehicle, two ways:
 - Using the mean of the *actual thrust curve* over the burn, which is what the
   framework computes: $\mathbf{8.1}$
 
-The framework's number is lower because averaging the digitised curve includes
+The framework's number is lower because averaging the digitized curve includes
 the tail-off, where thrust decays but is still above the 1 N threshold. Both are
 far above the 5.0 floor, but if you compare a hand calculation against the
 framework and get a ~6% difference, this is why.
@@ -255,12 +255,12 @@ The two differ because they define rail departure differently — see §14.
 
 ---
 
-# 4. Normal force and centre of pressure
+# 4. Normal force and center of pressure
 
 ## 4.1 Barrowman's method
 
 The classical method (James Barrowman, 1966) computes each component's normal
-force slope $C_{N\alpha,i}$ and its individual centre of pressure $X_i$, then
+force slope $C_{N\alpha,i}$ and its individual center of pressure $X_i$, then
 combines:
 
 $$C_{N\alpha,\text{total}} = \sum_i C_{N\alpha,i},
@@ -305,7 +305,7 @@ component. Integrating from the tip to the base:
 
 $$N = \rho U^2 \alpha \int_0^L \frac{dA}{dx}dx = \rho U^2 \alpha A_\text{base}$$
 
-Non-dimensionalising by $q A_\text{ref} = \tfrac12\rho U^2 A_\text{ref}$:
+Non-dimensionalizing by $q A_\text{ref} = \tfrac12\rho U^2 A_\text{ref}$:
 
 $$C_N = \frac{\rho U^2 \alpha A_\text{base}}{\tfrac12 \rho U^2 A_\text{ref}}
 = 2\alpha\frac{A_\text{base}}{A_\text{ref}}
@@ -317,7 +317,7 @@ With $A_\text{ref} = A_\text{base}$, $C_{N\alpha}=2$. ∎
 *This is directly verifiable in RocketPy's source: `nose_cone.py` sets
 `clalpha = 2 * radius_ratio**2`, and $\text{radius\_ratio}^2 = A_\text{base}/A_\text{ref}$.*
 
-A consequence worth internalising: **a straight body tube contributes no normal
+A consequence worth internalizing: **a straight body tube contributes no normal
 force** in classical Barrowman, because $dA/dx = 0$. Only area *changes* and
 fins generate normal force. OpenRocket adds a body-lift correction at higher
 $\alpha$ where this breaks down.
@@ -389,10 +389,10 @@ Two things to take from this:
    brings us to:
 
 **Requirement 2.11 says "while sitting on the pad", but a Barrowman CP is
-undefined at exactly zero airspeed** — there is no flow, so there is no centre
+undefined at exactly zero airspeed** — there is no flow, so there is no center
 of pressure. Some reference velocity must be chosen. The framework evaluates at
 **Mach 0.3**, which is OpenRocket's own GUI convention, so the number you report
-matches the number the team sees on screen. The table above is your defence if
+matches the number the team sees on screen. The table above is your defense if
 a reviewer asks.
 
 ---
@@ -528,7 +528,7 @@ need flight data — §11.8 and the FRR requirement.
 
 # 6. Mass properties
 
-## 6.1 Centre of gravity
+## 6.1 Center of gravity
 
 $$X_\text{cg} = \frac{\sum_i m_i X_i}{\sum_i m_i}$$
 
@@ -596,7 +596,7 @@ aerodynamic normal force acts at the CP:
 
 $$F_N = q A_\text{ref} C_{N\alpha}\,\alpha$$
 
-The rocket rotates freely about its **centre of gravity** (a body in free
+The rocket rotates freely about its **center of gravity** (a body in free
 flight rotates about its CG, not about any structural point). The moment about
 the CG is therefore
 
@@ -618,7 +618,7 @@ disturbance and the rocket would tumble. ∎
 
 ## 7.3 Why calibers, and why 2.0
 
-Non-dimensionalising by diameter makes the criterion **scale-independent**: a
+Non-dimensionalizing by diameter makes the criterion **scale-independent**: a
 3-inch and a 6-inch rocket with the same margin in calibers have comparable
 handling. Expressing it in inches would not transfer between vehicles.
 
@@ -657,7 +657,7 @@ able to compute by hand.
 
 ## 8.1 The pitch oscillation equation
 
-Linearising about small $\alpha$, pitch obeys a damped second-order system:
+Linearizing about small $\alpha$, pitch obeys a damped second-order system:
 
 $$I_L\ddot\theta + C_2\dot\theta + C_1\theta = 0$$
 
@@ -722,7 +722,7 @@ $$\mathbf{I}\dot{\vec\omega} + \vec\omega\times(\mathbf{I}\vec\omega) = \vec{\ma
 
 The $\vec\omega\times(\mathbf I\vec\omega)$ term is gyroscopic coupling. For an
 axisymmetric rocket with $I_L \gg I_R$ this couples roll into pitch/yaw: a
-rolling rocket resists pitching, which is why spin-stabilised vehicles work and
+rolling rocket resists pitching, which is why spin-stabilized vehicles work and
 why a fast-rolling finned rocket behaves differently from a non-rolling one.
 
 Expanded for $\mathbf I = \text{diag}(I_R, I_L, I_L)$:
@@ -844,7 +844,7 @@ Its magnitude scales with static margin: a stiffer rocket aligns faster and
 weathercocks harder. This is the practical upper bound on static margin
 mentioned in §7.3.
 
-## 10.3 Measured behaviour
+## 10.3 Measured behavior
 
 Framework output for the template vehicle, wind of 15 mph **from 180°** (out of
 the south). Negative $y$ is upwind (south), positive $y$ downwind (north):
@@ -899,10 +899,10 @@ someone will be asked to defend.
 
 Wind variability belongs in the **Monte Carlo**, where wind speed and direction
 are dispersed explicitly, the seed genuinely controls the outcome, and the
-result is a distribution rather than one arbitrary realisation.
+result is a distribution rather than one arbitrary realization.
 
 Pass `wind_turbulence` explicitly if you want it for a one-off study — for
-example, to check the sensitivity of rail-exit behaviour to gusts.
+example, to check the sensitivity of rail-exit behavior to gusts.
 
 ---
 
@@ -1012,7 +1012,7 @@ distribution stays clear of it.
 
 Requirement 3.11 caps descent at **100 s** apogee-to-touchdown. Requirement 3.10
 caps drift at **2,500 ft**. These pull in opposite directions, and understanding
-why is worth more than memorising both numbers.
+why is worth more than memorizing both numbers.
 
 Two-phase descent from apogee $h_a$ with main deployment at $h_m$:
 
@@ -1043,7 +1043,7 @@ the 100 s limit. The available moves:
 
 **Deploying the main lower is the move that helps both** — it shortens the slow
 phase without changing landing speed. This is why requirement 3.1.1 exists
-(main no lower than 500 ft): it prevents teams from optimising this trade into
+(main no lower than 500 ft): it prevents teams from optimizing this trade into
 a configuration with no altitude left to recover from a failed deployment. The
 template deploys at 600 ft, leaving a small buffer above the floor.
 
@@ -1082,7 +1082,7 @@ The FRR requires:
 > *"Estimate the drag coefficient of the full-scale rocket utilizing launch
 > data. Use this value to run a post-flight simulation."*
 
-The framework fits a single multiplicative scale $k$ on $C_D(M)$ by minimising
+The framework fits a single multiplicative scale $k$ on $C_D(M)$ by minimizing
 the apogee residual (or full ascent RMSE):
 
 $$k^\star = \arg\min_k \left| h_\text{apogee}^\text{sim}(k) - h_\text{apogee}^\text{measured} \right|$$
@@ -1240,7 +1240,7 @@ RSO on the day rather than chosen by the team. Landing speed — and therefore
 kinetic energy at touchdown, requirement 3.2 — is a main-parachute problem and
 essentially nothing else.
 
-So there is no point agonising over a quarter-pound of mass while carrying a 7%
+So there is no point agonizing over a quarter-pound of mass while carrying a 7%
 drag uncertainty, and no point tuning drag at all if the question you are asking
 is about landing energy.
 
@@ -1295,7 +1295,7 @@ These are exactly reproducible: `python scripts/run_nominal.py`.
 ## 14.1 Rail exit velocity, −10.6%
 
 **Definitional, not physical.** OpenRocket releases the vehicle when the forward
-rail button passes the rail tip; RocketPy when the centre of mass has travelled
+rail button passes the rail tip; RocketPy when the center of mass has traveled
 the full rail length. The effective travel differs by roughly the button
 spacing.
 
@@ -1356,7 +1356,7 @@ so ascent is the correct window anyway.
 
 **The general lesson:** when two tools disagree wildly, suspect a definition
 mismatch before suspecting physics. A 216% discrepancy is almost never a subtle
-modelling difference.
+modeling difference.
 
 ## 14.4 What agreement does and does not prove
 
@@ -1461,7 +1461,7 @@ $$
 align and one degree of freedom is lost, with the rate equations becoming
 singular. A rocket passes through 90° pitch at apogee on any windy day, so this
 is not an edge case. Quaternions have no singularity. Their cost is a redundant
-fourth parameter and the need to renormalise periodically, since numerical
+fourth parameter and the need to renormalize periodically, since numerical
 integration slowly drifts $|\mathbf q|$ away from 1.
 
 ## Appendix D — Descent time with a non-constant density

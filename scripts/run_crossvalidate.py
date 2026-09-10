@@ -36,7 +36,7 @@ KNOWN_DIFFERENCES = {
     "Rail exit velocity": (
         "Different definitions of leaving the rail. OpenRocket releases the "
         "vehicle when the forward rail button passes the rail tip; RocketPy "
-        "when the centre of mass has travelled the full rail length. The "
+        "when the center of mass has traveled the full rail length. The "
         "effective travel therefore differs by roughly the button spacing. "
         "RocketPy reads lower, so treating it as the governing number for "
         "req 2.14 is the conservative choice."

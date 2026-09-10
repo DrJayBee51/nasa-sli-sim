@@ -1,8 +1,8 @@
 """Report-ready plots and tables.
 
-Figures are sized and labelled for a design review document, not for a
+Figures are sized and labeled for a design review document, not for a
 notebook: readable axis labels with units, requirement limits drawn as
-annotated lines, and no reliance on colour alone to carry meaning.
+annotated lines, and no reliance on color alone to carry meaning.
 """
 
 from __future__ import annotations

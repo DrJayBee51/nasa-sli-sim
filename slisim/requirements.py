@@ -171,7 +171,7 @@ def check_kinetic_energy(section_masses_kg: dict[str, float],
                          total_mps: float | None = None) -> list[Check]:
     """Req 3.2 - each independent section <= 75 ft-lbf of KE at landing.
 
-    Which velocity belongs in ``1/2 m v^2`` is a real modelling decision, and
+    Which velocity belongs in ``1/2 m v^2`` is a real modeling decision, and
     it changes parachute sizing by a full chute size:
 
     * ``vertical_mps`` - the descent rate.  This is what the handbook's FRR

@@ -452,10 +452,12 @@
     <div class="eyebrow">NASA Student Launch · 2026–2027 · Vehicle Simulation</div>
     <h1>Two engines,<br>one rocket.</h1>
     <p class="standfirst">
-      We simulate every flight twice — once in <strong>OpenRocket</strong>, once in
-      <strong>RocketPy</strong> — from a single vehicle definition. One gives us the flight
-      we expect. The other gives us the <strong>thousand flights we might actually get</strong>.
-      Then we go fly, and the real data corrects them both.
+      One vehicle definition, two simulators. <strong>OpenRocket</strong> gives us the flight
+      we expect, and we put that same flight through <strong>RocketPy</strong> to check the
+      answer isn't an artifact of one tool. RocketPy then flies it a thousand more times,
+      varying everything we're uncertain about, to show
+      <strong>the flights we might actually get</strong>. Then we go fly for real, and the
+      measured data corrects them both.
     </p>
 
     <div class="stats">
@@ -525,7 +527,7 @@
           <text x="419" y="199" class="t-chip" text-anchor="middle">Motor thrust</text>
           <text x="419" y="216" class="t-chip" text-anchor="middle">curve</text>
 
-          <!-- shared input, centre -->
+          <!-- shared input, center -->
           <rect x="506" y="172" width="228" height="58" rx="3" class="blk"/>
           <text x="620" y="199" class="t-chip" text-anchor="middle">Launch site · wind</text>
           <text x="620" y="216" class="t-chip" text-anchor="middle">temperature · pressure</text>
@@ -663,7 +665,7 @@
         <div class="col-head ind">Genuinely independent</div>
         <ul class="plain">
           <li><i>01</i><span>Flight dynamics — <em>two different integrators solving two different formulations</em></span></li>
-          <li><i>02</i><span>Centre of pressure — <em>each works it out from its own description of the rocket</em></span></li>
+          <li><i>02</i><span>Center of pressure — <em>each works it out from its own description of the rocket</em></span></li>
           <li><i>03</i><span>Fin lift — <em>Barrowman versus Diederich; genuinely different theories</em></span></li>
           <li><i>04</i><span>Atmosphere, wind and event detection</span></li>
           <li><i>05</i><span>Descent solver — <em>different schemes entirely</em></span></li>
@@ -673,7 +675,7 @@
         <div class="col-head shr">Shared, by design</div>
         <ul class="plain">
           <li><i>—</i><span>The motor thrust curve</span></li>
-          <li><i>—</i><span>Mass, centre of gravity and inertia</span></li>
+          <li><i>—</i><span>Mass, center of gravity and inertia</span></li>
           <li><i>—</i><span><strong>The drag coefficient</strong> — <em>RocketPy has no drag model of its own; it has to be told</em></span></li>
         </ul>
         <div class="punch">
@@ -882,7 +884,7 @@
       <div class="out">
         <h3>An apogee we can defend</h3>
         <p>Not “4,534 ft” but “4,440 ft, with 95% of cases between 4,068 and 4,818.”
-           The number we declare at CDR is the centre of that spread.</p>
+           The number we declare at CDR is the center of that spread.</p>
         <div class="answers">ANSWERS REQ 2.1 · REQ 2.3</div>
       </div>
       <div class="out">

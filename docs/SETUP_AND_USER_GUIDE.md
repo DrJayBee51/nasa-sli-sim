@@ -83,7 +83,7 @@ Using both gets you two things at once:
 - **The "different calculation method" the handbook asks for** — provided you
   are honest about which parts are genuinely independent. See §1.4.
 
-## 1.3 How the framework is organised
+## 1.3 How the framework is organized
 
 The central design decision is that **`config/vehicle.yaml` is the single
 source of truth.** From that one file the framework generates:
@@ -111,7 +111,7 @@ source of truth.** From that one file the framework generates:
 ```
 
 There is no second place to keep in sync. If the two models ever disagreed
-about the rocket's mass, that would be a bug in the framework, not a modelling
+about the rocket's mass, that would be a bug in the framework, not a modeling
 choice.
 
 ## 1.4 What is genuinely independent — read this before writing a report
@@ -123,7 +123,7 @@ dismantle.
 | Quantity | Independent? | Why |
 |---|---|---|
 | Flight dynamics integration | **Yes** | RocketPy: 6-DOF, LSODA. OpenRocket: 6-DOF, RK4 |
-| Centre of pressure / normal force | **Yes** | Each runs its own Barrowman-family model over its own geometry |
+| Center of pressure / normal force | **Yes** | Each runs its own Barrowman-family model over its own geometry |
 | Fin lift model | **Yes** | RocketPy uses Diederich planform correlation + Prandtl–Glauert; OpenRocket uses its own extended Barrowman |
 | Atmosphere and wind | **Yes** | Separate implementations |
 | Descent solver | **Yes** | Different schemes entirely (see `FLIGHT_DYNAMICS.md` §9.5) |
@@ -194,7 +194,7 @@ Close and reopen PowerShell, then verify:
 java -version
 ```
 
-Expect `openjdk version "17..."` or higher. If `java` is not recognised after
+Expect `openjdk version "17..."` or higher. If `java` is not recognized after
 reopening the terminal, see [§9.2](#92-java-not-found).
 
 **Step 3 — Create the virtual environment**
@@ -363,7 +363,7 @@ Length  : 103.0 in   Diameter: 6.00 in
 ```
 
 That `.ork` is a real OpenRocket file. **Open it in the GUI now** — it is the
-quickest way to convince yourself the framework is modelling what you think it
+quickest way to convince yourself the framework is modeling what you think it
 is. You will see the nose cone, three body sections, the fin set, rail buttons,
 motor mount, and both parachutes.
 
@@ -387,7 +387,7 @@ between a good report and a great one:
 
 - **Rail exit velocity (−10.6%).** The two tools define "off the rail"
   differently. OpenRocket releases the vehicle when the forward rail button
-  passes the rail tip; RocketPy when the centre of mass has travelled the full
+  passes the rail tip; RocketPy when the center of mass has traveled the full
   rail length. RocketPy reads lower, so quoting RocketPy for requirement 2.14
   (≥52 fps) is the conservative choice.
 - **Drift (−10%).** This one originates during *ascent*, not descent. The
@@ -496,7 +496,7 @@ ft."** That is a defensible statement.
 ```
 
 Requirement 2.3 scores you on closeness to the altitude you declare at CDR. The
-best declaration is therefore the **centre of your predicted distribution** —
+best declaration is therefore the **center of your predicted distribution** —
 not the nominal run, and not the middle of the legal window.
 
 **Sensitivity** — what actually drives apogee (1,000 cases, seed 12345):
@@ -646,7 +646,7 @@ motor:
 OpenRocket jar — no network access and no per-machine motor files. Use
 `list_motors.py` to find the exact designation.
 
-> **The motor is modelled plugged.** Requirement 3.1.3 forbids motor ejection
+> **The motor is modeled plugged.** Requirement 3.1.3 forbids motor ejection
 > as a deployment method, so the framework sets the ejection delay to
 > OpenRocket's `PLUGGED` value. Leaving a numeric delay fires an ejection charge
 > at burnout, adds a `Tumbling` phase, and silently invalidates your entire
@@ -926,14 +926,14 @@ number you will pick all season.
    up.
 
 Declaring the nominal-run apogee is a common and costly mistake: the nominal
-run is not the centre of the distribution once asymmetric effects are included.
+run is not the center of the distribution once asymmetric effects are included.
 
 ## 8.4 Subscale flight
 
 Build a subscale `vehicle.yaml` (requirements 2.15, 2.16: minimum E impulse,
 ≤75% of full-scale dimensions). Fly it, then run `fit_cd.py` on the altimeter
 data. You will not get the full-scale drag coefficient from a subscale flight —
-Reynolds numbers differ — but you *will* validate that your whole modelling
+Reynolds numbers differ — but you *will* validate that your whole modeling
 process produces the right answer, which is the real purpose.
 
 ## 8.5 Vehicle Demonstration Flight — the important one
@@ -1210,7 +1210,7 @@ output/*.ork              open in OpenRocket GUI
 |---|---|
 | **AGL / MSL** | Above Ground Level / Mean Sea Level. Apogee requirements are AGL; air density depends on MSL. |
 | **Caliber** | One body diameter. Static margin is expressed in calibers so it scales. |
-| **CG / CP** | Centre of gravity / centre of pressure. Stability needs CP behind CG. |
+| **CG / CP** | Center of gravity / center of pressure. Stability needs CP behind CG. |
 | **Cd·S** | Drag coefficient times reference area. The physically meaningful parachute parameter. |
 | **GLOW** | Gross Lift-Off Weight. |
 | **Static margin** | (CP − CG) / diameter, in calibers. Requirement 2.11 needs ≥ 2.0. |

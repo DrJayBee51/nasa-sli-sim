@@ -310,7 +310,7 @@ def build_rocket(vehicle: Vehicle, or_motor, mass_props: dict[str, float],
 
     total_len = vehicle.total_length_m
     motor_len = float(or_motor.getLength())
-    # Motor centre of mass sits just forward of the aft end, allowing overhang.
+    # Motor center of mass sits just forward of the aft end, allowing overhang.
     rocket.add_motor(
         build_motor(vehicle, or_motor,
                     scale_impulse=impulse_scale,

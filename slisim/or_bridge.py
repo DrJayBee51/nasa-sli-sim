@@ -337,7 +337,7 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
     # --- recovery devices
     #  Drogue rides in the section forward of the av-bay; main forward of that.
     #  Exact bay assignment barely moves the trajectory but does move the CG,
-    #  so it is modelled rather than lumped.
+    #  so it is modeled rather than lumped.
     def add_chute(spec: dict, parent, offset_frac: float):
         chute = RC.Parachute()
         chute.setName(spec["name"])
@@ -388,7 +388,7 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
     mcfg = core.motor.MotorConfiguration(mount, config_id)
     mcfg.setMotor(motor)
     # Requirement 3.1.3 forbids motor ejection as a deployment method, so the
-    # motor is modelled PLUGGED.  Leaving the default delay in place fires an
+    # motor is modeled PLUGGED.  Leaving the default delay in place fires an
     # ejection charge at burnout and silently invalidates the whole descent.
     Motor = jpype.JClass("info.openrocket.core.motor.Motor")
     mcfg.setEjectionDelay(float(Motor.PLUGGED_DELAY))

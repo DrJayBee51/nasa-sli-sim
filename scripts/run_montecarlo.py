@@ -98,7 +98,7 @@ def main() -> int:
     print(report.table(sens.head(10), "{:.3f}"))
     print()
 
-    # --- artefacts
+    # --- artifacts
     out_dir.mkdir(parents=True, exist_ok=True)
     tag = f"{args.engine}_n{args.samples}_{args.ballast}"
     csv = out_dir / f"montecarlo_{tag}.csv"

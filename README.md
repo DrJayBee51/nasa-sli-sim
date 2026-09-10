@@ -199,7 +199,7 @@ Both are expected and explained; `run_crossvalidate.py` prints them and flags
 anything *not* on this list as unexplained.
 
 - **Rail exit velocity, ~10%.** The two tools define leaving the rail
-  differently (forward rail button clearing the tip vs. the CG travelling the
+  differently (forward rail button clearing the tip vs. the CG traveling the
   full rail length). RocketPy reads lower, so it is the conservative number for
   req 2.14.
 - **Drift, ~10%.** Originates in *ascent* weathercocking, not descent — the
@@ -230,7 +230,7 @@ belongs in the Monte Carlo, where the seed genuinely controls the outcome.
   structure. The motor mount and rail buttons are mass-overridden to zero in the
   OpenRocket model so their material mass is not double-counted; without that,
   the FRR mass budget does not close.
-- **The motor is modelled PLUGGED** (req 3.1.3 bans motor ejection). Leaving
+- **The motor is modeled PLUGGED** (req 3.1.3 bans motor ejection). Leaving
   OpenRocket's default ejection delay fires a charge at burnout and silently
   invalidates the entire descent analysis.
 - **Never hand RocketPy a scalar pressure** for `custom_atmosphere` — it becomes

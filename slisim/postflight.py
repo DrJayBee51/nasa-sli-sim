@@ -51,7 +51,7 @@ def _match(columns: list[str], keys: list[str]) -> str | None:
 
 @dataclass
 class FlightData:
-    """Measured flight data, normalised to SI internally."""
+    """Measured flight data, normalized to SI internally."""
 
     time_s: np.ndarray
     altitude_m: np.ndarray
@@ -86,7 +86,7 @@ def load_altimeter_csv(path: str | Path, altitude_units: str = "auto",
 
     Altimeter exports vary wildly, so columns are auto-detected and the
     altitude unit is inferred from magnitude unless stated.  A 5,000 ft flight
-    reads ~5000 in feet and ~1524 in metres, which is unambiguous for any SLI
+    reads ~5000 in feet and ~1524 in meters, which is unambiguous for any SLI
     vehicle, but pass `altitude_units` explicitly if you would rather not rely
     on that.
     """
@@ -110,7 +110,7 @@ def load_altimeter_csv(path: str | Path, altitude_units: str = "auto",
     t, a = t[good], a[good]
 
     if altitude_units == "auto":
-        # SLI apogees are 3,500-6,500 ft; in metres that is 1,067-1,981.
+        # SLI apogees are 3,500-6,500 ft; in meters that is 1,067-1,981.
         units = "ft" if np.nanmax(a) > 2500 else "m"
     else:
         units = altitude_units
@@ -150,7 +150,7 @@ class CdFitResult:
             f"  Post-fit prediction  : {self.fitted_apogee_ft:,.0f} ft "
             f"({self.residual_ft:+,.0f} ft residual)\n"
             f"  Ascent RMSE          : {self.rmse_ft:,.0f} ft\n"
-            f"  Optimiser iterations : {self.n_iterations}"
+            f"  Optimizer iterations : {self.n_iterations}"
         )
 
 
@@ -211,7 +211,7 @@ def fit_cd_scale(vehicle: Vehicle, site: Site, measured: FlightData,
     best = float(opt.x)
     final = simulate(best)
 
-    # Ascent RMSE reported regardless of which objective was optimised, so the
+    # Ascent RMSE reported regardless of which objective was optimized, so the
     # two modes stay comparable.
     s = final.series
     asc = s["time_s"] <= final.time_to_apogee_s

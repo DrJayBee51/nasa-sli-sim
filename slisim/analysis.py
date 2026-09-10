@@ -166,7 +166,7 @@ def recommend_target(df: pd.DataFrame) -> dict[str, float]:
     """Suggest the altitude to declare at CDR.
 
     The score rewards closeness to the declared target, so the best declaration
-    is the CENTRE of the predicted distribution, not the nominal run and not
+    is the CENTER of the predicted distribution, not the nominal run and not
     the middle of the legal window.  The median is used rather than the mean
     because apogee distributions are mildly left-skewed (drag and mass errors
     both push one way).
