@@ -25,8 +25,8 @@ correlations by evaluating them. Where a claim rests on OpenRocket's published
 technical documentation rather than direct verification, it says so. RocketPy's
 behavior was read from the installed 1.13.0 source.
 
-The companion document, [`SETUP_AND_USER_GUIDE.md`](SETUP_AND_USER_GUIDE.md),
-covers installation and operation.
+The companion documents, [`SETUP_GUIDE.md`](SETUP_GUIDE.md) and
+[`USER_GUIDE.md`](USER_GUIDE.md), cover installation and operation.
 
 ---
 

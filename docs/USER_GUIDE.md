@@ -1,349 +1,55 @@
-# Setup and User Guide
+# User Guide
 
 **NASA Student Launch — Dual-Engine Simulation Framework**
 Season 2026–2027 · College/University (USLI) ruleset
 
-This guide takes you from a laptop with nothing installed to running a
-1,000-case Monte Carlo dispersion analysis and reading the results. It assumes
-no prior experience with Python virtual environments, Java, or either
-simulation tool. Every command is written out in full for Windows, macOS, and
-Linux.
+This guide covers using the framework once it is installed: a guided first
+run, defining your vehicle, launch sites, Monte Carlo dispersion, reading the
+output, and how the tools fit the season's milestones. If you have not
+installed it yet, start with the [Setup Guide](SETUP_GUIDE.md). Everything here
+assumes its verification step (§2.7) passes.
 
-Read Part 1 once. Work through Part 3 at a keyboard — it takes about 30 minutes
-and it is the fastest way to understand what the framework does.
+Work through Part 1 at a keyboard — it takes about 30 minutes and it is the
+fastest way to understand what the framework does.
 
-The companion document, [`FLIGHT_DYNAMICS.md`](FLIGHT_DYNAMICS.md), explains the
-physics behind everything here.
+Every step here is a command typed into a terminal and run from the project
+folder, and every result is text in the terminal or a file written to
+`output/`. See
+[Before you start](SETUP_GUIDE.md#before-you-start-this-is-a-command-line-tool)
+in the Setup Guide if that is unfamiliar.
+
+> **Shorthand.** This guide writes `python` for whichever of
+> `.venv\Scripts\python` (Windows PowerShell), `.venv/Scripts/python` (Git Bash
+> on Windows), or `.venv/bin/python` (macOS/Linux) applies to your machine.
+> Always use the one inside `.venv` — a bare `python` will use your system
+> Python and fail with `ModuleNotFoundError`.
+
+Two further companions: [`FRAMEWORK_TOUR.md`](FRAMEWORK_TOUR.md) walks through
+how the code is structured, and [`FLIGHT_DYNAMICS.md`](FLIGHT_DYNAMICS.md)
+explains the physics behind everything here.
 
 ---
 
 ## Table of contents
 
-- [Part 1 — What this is and why](#part-1--what-this-is-and-why)
-- [Part 2 — Installation](#part-2--installation)
-- [Part 3 — Guided first run](#part-3--guided-first-run)
-- [Part 4 — Defining your vehicle](#part-4--defining-your-vehicle)
-- [Part 5 — Launch sites](#part-5--launch-sites)
-- [Part 6 — Uncertainty and Monte Carlo](#part-6--uncertainty-and-monte-carlo)
-- [Part 7 — Reading the output](#part-7--reading-the-output)
-- [Part 8 — Season workflow](#part-8--season-workflow)
-- [Part 9 — Troubleshooting](#part-9--troubleshooting)
-- [Part 10 — Command reference](#part-10--command-reference)
+- [Part 1 — Guided first run](#part-1--guided-first-run)
+- [Part 2 — Defining your vehicle](#part-2--defining-your-vehicle)
+- [Part 3 — Launch sites](#part-3--launch-sites)
+- [Part 4 — Uncertainty and Monte Carlo](#part-4--uncertainty-and-monte-carlo)
+- [Part 5 — Reading the output](#part-5--reading-the-output)
+- [Part 6 — Season workflow](#part-6--season-workflow)
+- [Part 7 — Troubleshooting](#part-7--troubleshooting)
+- [Part 8 — Command reference](#part-8--command-reference)
 - [Appendix A — Cheat sheet](#appendix-a--cheat-sheet)
 - [Appendix B — Glossary](#appendix-b--glossary)
 
 ---
 
-# Part 1 — What this is and why
-
-## 1.1 The problem this solves
-
-The handbook asks, in the Mission Performance Predictions section of the PDR,
-the CDR, *and* the FRR:
-
-> *"Present data from a different calculation method to verify that original
-> results are accurate."*
-> *"Discuss any differences between the different calculations."*
-> *"Perform multiple simulations to verify that results are precise."*
-
-Most teams satisfy the third bullet by running OpenRocket four or five times
-with different wind speeds and putting the numbers in a table. That is a weak
-answer, and a reviewer can tell. It shows that the *simulation* is repeatable;
-it says nothing about whether the *vehicle* is.
-
-The real question a reviewer is asking is: **given that you do not know your
-rocket's mass to better than half a pound, its drag to better than a few
-percent, or the wind on launch day at all — how confident are you that you will
-land inside the 4,000–6,000 ft window?**
-
-That is a probability, not a number. Producing it requires:
-
-1. Declaring what you are uncertain about, and by how much.
-2. Sampling those uncertainties hundreds of times.
-3. Running a flight simulation for each sample.
-4. Reporting the resulting distribution.
-
-That is a Monte Carlo analysis, and it is what this framework automates.
-
-## 1.2 Why two simulators
-
-**OpenRocket** is the tool the team designs in. It has a GUI, a component
-tree, a motor database, and it is what everyone at a launch understands. Its
-weakness for this purpose is that scripting hundreds of dispersed runs through
-the GUI is impractical.
-
-**RocketPy** is a Python library. It has no GUI and no component database, but
-it is trivially scriptable, and its flight dynamics are an independent
-implementation — different equations of motion, a different integrator, a
-different fin aerodynamics model.
-
-Using both gets you two things at once:
-
-- **Monte Carlo capability** (RocketPy, fast and scriptable).
-- **The "different calculation method" the handbook asks for** — provided you
-  are honest about which parts are genuinely independent. See §1.4.
-
-## 1.3 How the framework is organized
-
-The central design decision is that **`config/vehicle.yaml` is the single
-source of truth.** From that one file the framework generates:
-
-- a RocketPy model, built in memory, and
-- a real `.ork` file you can open in the OpenRocket GUI.
-
-```
-                   config/vehicle.yaml
-                    (you edit this)
-                           |
-              +------------+------------+
-              |                         |
-        or_bridge.py             rocketpy_model.py
-              |                         |
-     OpenRocket 24.12            RocketPy 1.13
-     (headless, via Java)        (pure Python)
-              |                         |
-              +------------+------------+
-                           |
-              requirements.py  (USLI checks)
-              montecarlo.py    (dispersion)
-              analysis.py      (statistics)
-              report.py        (figures, tables)
-```
-
-There is no second place to keep in sync. If the two models ever disagreed
-about the rocket's mass, that would be a bug in the framework, not a modeling
-choice.
-
-## 1.4 What is genuinely independent — read this before writing a report
-
-This matters more than it sounds. Claiming your two tools independently
-validate each other, when they share inputs, is a claim a sharp reviewer can
-dismantle.
-
-| Quantity | Independent? | Why |
-|---|---|---|
-| Flight dynamics integration | **Yes** | RocketPy: 6-DOF, LSODA. OpenRocket: 6-DOF, RK4 |
-| Center of pressure / normal force | **Yes** | Each runs its own Barrowman-family model over its own geometry |
-| Fin lift model | **Yes** | RocketPy uses Diederich planform correlation + Prandtl–Glauert; OpenRocket uses its own extended Barrowman |
-| Atmosphere and wind | **Yes** | Separate implementations |
-| Descent solver | **Yes** | Different schemes entirely (see `FLIGHT_DYNAMICS.md` §9.5) |
-| Thrust curve | **No — shared** | Exported from OpenRocket's motor database |
-| Mass, CG, inertia | **No — shared** | Taken from OpenRocket's mass calculator |
-| **Drag coefficient Cd(Mach)** | **No — shared** | Sampled from an OpenRocket run |
-
-**Why drag is shared:** RocketPy has no parasitic-drag model at all.
-`power_off_drag` is a *required input*, not something RocketPy derives from
-geometry. There is no version of this framework in which RocketPy independently
-confirms OpenRocket's drag estimate — that would require a third source.
-
-**What to write instead:** "The two tools independently confirm the trajectory,
-stability, and recovery dynamics that follow from a shared drag estimate. The
-drag estimate itself was validated separately against flight data from the
-Vehicle Demonstration Flight." Then do exactly that with `fit_cd.py` (Part 8).
-
-This is not a limitation to hide. It is the correct scope of the claim, and
-stating it precisely is worth more in a review than overstating it.
-
----
-
-# Part 2 — Installation
-
-## 2.1 What you are installing, and why
-
-| Component | Why it is needed |
-|---|---|
-| **Python 3.12 or 3.13** | Runs the framework. **Not 3.14** — RocketPy's dependency stack does not yet have complete wheels for it. |
-| **A virtual environment** (venv) | An isolated folder of Python packages, so this project's pinned versions cannot break other Python work on your machine, and so everyone on the team has identical versions. |
-| **Java JDK 17 or newer** | OpenRocket is a Java program. The framework runs its real solver headlessly, so a Java runtime must be present. You do not write any Java. |
-| **`OpenRocket-24.12.jar`** | The OpenRocket engine itself, ~80 MB. Not committed to the repository because of its size. |
-| **OpenRocket GUI** (optional but recommended) | For opening the `.ork` files the framework generates, and for ordinary design work. |
-
-A note on why a *JDK* rather than just a JRE: modern OpenRocket distributions
-bundle a private runtime that the framework cannot reliably locate, so
-installing a JDK is the dependable route.
-
-## 2.2 Windows
-
-Open **PowerShell**. You do not need Administrator except where noted.
-
-**Step 1 — Python 3.13**
-
-```powershell
-winget install --id Python.Python.3.13 --scope user
-```
-
-Close and reopen PowerShell, then verify:
-
-```powershell
-py -0p
-```
-
-You should see a line containing `3.13`. If `winget` is unavailable, download
-the installer from <https://www.python.org/downloads/> and **tick "Add
-python.exe to PATH"** during installation.
-
-**Step 2 — Java JDK 17** (this one will prompt for Administrator)
-
-```powershell
-winget install --id Microsoft.OpenJDK.17
-```
-
-Close and reopen PowerShell, then verify:
-
-```powershell
-java -version
-```
-
-Expect `openjdk version "17..."` or higher. If `java` is not recognized after
-reopening the terminal, see [§9.2](#92-java-not-found).
-
-**Step 3 — Create the virtual environment**
-
-```powershell
-cd A:\Projects\NASA_SLI\sim
-py -3.13 -m venv .venv
-```
-
-**Step 4 — Install the Python packages**
-
-```powershell
-.venv\Scripts\python -m pip install --upgrade pip
-.venv\Scripts\python -m pip install -r requirements.txt
-```
-
-This downloads roughly 200 MB and takes a few minutes.
-
-> **On activation.** You may see guides tell you to run
-> `.venv\Scripts\Activate.ps1` first. You do not need to. Calling
-> `.venv\Scripts\python` directly does the same thing and avoids PowerShell
-> execution-policy problems entirely. Every command in this guide uses the
-> direct form. If you *want* activation, run
-> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then
-> `.venv\Scripts\Activate.ps1`.
-
-**Step 5 — Download the OpenRocket engine**
-
-```powershell
-curl.exe -L -o vendor\OpenRocket-24.12.jar `
-  https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
-```
-
-Note `curl.exe`, not `curl` — in PowerShell the bare word is an alias for
-`Invoke-WebRequest`, which will not work here.
-
-Verify the size is about 80 MB:
-
-```powershell
-(Get-Item vendor\OpenRocket-24.12.jar).Length / 1MB
-```
-
-## 2.3 macOS
-
-Open **Terminal**. These instructions use [Homebrew](https://brew.sh); install
-it first if you do not have it.
-
-```bash
-# Step 1 - Python 3.13
-brew install python@3.13
-
-# Step 2 - Java JDK 17
-brew install --cask temurin@17
-java -version          # expect 17 or higher
-
-# Step 3 - virtual environment
-cd /path/to/NASA_SLI/sim
-python3.13 -m venv .venv
-
-# Step 4 - packages
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
-
-# Step 5 - OpenRocket engine
-curl -L -o vendor/OpenRocket-24.12.jar \
-  https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
-```
-
-On Apple Silicon, if Java fails to start, confirm you installed the ARM build:
-`java -XshowSettings:properties -version 2>&1 | grep os.arch` should report
-`aarch64`.
-
-## 2.4 Linux
-
-**Debian / Ubuntu:**
-
-```bash
-sudo apt update
-sudo apt install python3.13 python3.13-venv openjdk-17-jdk curl
-```
-
-If your distribution has no `python3.13` package, `python3.12` works equally
-well — substitute it everywhere below.
-
-**Fedora / RHEL:**
-
-```bash
-sudo dnf install python3.13 java-17-openjdk-devel curl
-```
-
-**Arch:**
-
-```bash
-sudo pacman -S python jdk17-openjdk curl
-```
-
-Then, on any distribution:
-
-```bash
-cd /path/to/NASA_SLI/sim
-python3.13 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
-curl -L -o vendor/OpenRocket-24.12.jar \
-  https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
-```
-
-## 2.5 The OpenRocket GUI (optional)
-
-Download the installer for your platform from
-<https://openrocket.info/downloads.html>. **Use version 24.12** so the GUI
-matches the engine the framework drives — otherwise a file the framework writes
-may open with subtly different results.
-
-## 2.6 Verifying the installation
-
-Run the built-in nominal analysis:
-
-```powershell
-.venv\Scripts\python scripts\run_nominal.py          # Windows
-```
-```bash
-.venv/bin/python scripts/run_nominal.py              # macOS / Linux
-```
-
-The first run takes about 30 seconds — most of that is the JVM starting and
-OpenRocket loading its 1,088-motor database. You should see a comparison table,
-then a requirement table ending in:
-
-```
-  15 pass, 1 warn, 0 FAIL
-
-  RESULT: all requirements satisfied
-```
-
-If you got that, you are done. If not, go to [Part 9](#part-9--troubleshooting).
-
-> **Shorthand from here on.** The rest of this guide writes `python` for
-> whichever of `.venv\Scripts\python` or `.venv/bin/python` applies to your
-> machine. Always use the one inside `.venv` — a bare `python` will use your
-> system Python and fail with `ModuleNotFoundError`.
-
----
-
-# Part 3 — Guided first run
+# Part 1 — Guided first run
 
 Work through this at a keyboard. Roughly 30 minutes.
 
-## 3.1 The nominal flight
+## 1.1 The nominal flight
 
 ```bash
 python scripts/run_nominal.py
@@ -408,7 +114,7 @@ between a good report and a great one:
                    `-- 17.00 lb at 14.6 fps descent rate; incl. horizontal drift = 106.5 ft-lbf (over 75)
 ```
 
-Read that second note carefully — it is discussed in [§7.3](#73-the-kinetic-energy-subtlety).
+Read that second note carefully — it is discussed in [§5.3](#53-the-kinetic-energy-subtlety).
 
 Three status levels:
 
@@ -418,7 +124,7 @@ Three status levels:
 | `WARN` | Compliant, but costing points (e.g. the mass score) or close to a limit. |
 | `FAIL` | Requirement violated. Must be fixed. |
 
-## 3.2 Both ballast configurations
+## 1.2 Both ballast configurations
 
 Requirement 2.20.7.4 says *all* requirements must be met at both the minimum
 and maximum ballast configurations. One command:
@@ -431,7 +137,7 @@ The max-ballast case lands about 340 ft lower. That is ballast doing its job —
 it is a trim knob — but it means the altitude you declare at CDR should be
 chosen knowing your ballast range, not from the minimum-ballast run alone.
 
-## 3.3 Browsing motors
+## 1.3 Browsing motors
 
 ```bash
 python scripts/list_motors.py --nasa
@@ -452,7 +158,7 @@ Lists the ten motors NASA identified as reliably available for 2027
 Search more broadly with `python scripts/list_motors.py L1` or filter with
 `--diameter-mm 75`.
 
-## 3.4 The cross-validation report
+## 1.4 The cross-validation report
 
 ```bash
 python scripts/run_crossvalidate.py
@@ -464,7 +170,7 @@ written discussion of each difference over 5%. Anything differing by more than
 5% that is *not* on the known-differences list is flagged as **unexplained**,
 which is your cue to investigate before citing the number.
 
-## 3.5 Your first Monte Carlo
+## 1.5 Your first Monte Carlo
 
 ```bash
 python scripts/run_montecarlo.py -n 200
@@ -520,7 +226,7 @@ ranking is not just noisier, it is wrong — development runs put `temperature_k
 third at 0.40, where 1,000 cases settle it at 0.10. Always record the sample
 size and seed next to any sensitivity number you publish.
 
-## 3.6 Post-flight analysis, before you have a flight
+## 1.6 Post-flight analysis, before you have a flight
 
 You do not want the FRR analysis to be the first time anyone runs this code.
 Generate synthetic altimeter data with a known drag error baked in:
@@ -548,13 +254,13 @@ is how you know the tool works before you trust it with real data.
 
 ---
 
-# Part 4 — Defining your vehicle
+# Part 2 — Defining your vehicle
 
 Everything lives in `config/vehicle.yaml`, authored in **inches and pounds**
 because that is how the handbook is written and how the team thinks. Conversion
 to SI happens once, in `slisim/units.py`.
 
-## 4.1 Airframe and nose cone
+## 2.1 Airframe and nose cone
 
 ```yaml
 airframe:
@@ -575,7 +281,7 @@ nose_cone:
 skin-friction calculation, and skin friction is about 58% of this vehicle's
 total drag. A rough finish costs real altitude.
 
-## 4.2 Body sections
+## 2.2 Body sections
 
 ```yaml
 sections:
@@ -601,7 +307,7 @@ Two consequences worth understanding:
    FRR mass budget will not close. The framework checks this automatically
    (`FRR-V  Mass budget closure`).
 
-## 4.3 Fins
+## 2.3 Fins
 
 ```yaml
 fins:
@@ -630,7 +336,7 @@ Fins are the main lever on static stability. On the template, going from
 difference between failing and passing requirement 2.11 — at a cost of about 45
 ft of apogee.
 
-## 4.4 Motor
+## 2.4 Motor
 
 ```yaml
 motor:
@@ -652,7 +358,7 @@ OpenRocket jar — no network access and no per-machine motor files. Use
 > at burnout, adds a `Tumbling` phase, and silently invalidates your entire
 > descent analysis.
 
-## 4.5 Recovery
+## 2.5 Recovery
 
 ```yaml
 recovery:
@@ -675,7 +381,7 @@ recovery:
 of the least certain numbers in the whole model, which is why
 `uncertainty.yaml` disperses it by 10%.
 
-## 4.6 Landing sections
+## 2.6 Landing sections
 
 ```yaml
 landing_sections:
@@ -693,7 +399,7 @@ These must **partition** the vehicle — every mass assigned exactly once. The
 framework reports anything left unassigned, and the `FRR-V` check will fail if
 the arithmetic does not close.
 
-## 4.7 Ballast and target
+## 2.7 Ballast and target
 
 ```yaml
 ballast:
@@ -709,7 +415,7 @@ at both extremes, and the extremes differ by hundreds of feet.
 
 ---
 
-# Part 5 — Launch sites
+# Part 3 — Launch sites
 
 `config/sites.yaml`:
 
@@ -743,13 +449,13 @@ Add your home field for subscale and demonstration flights, then select with
 
 ---
 
-# Part 6 — Uncertainty and Monte Carlo
+# Part 4 — Uncertainty and Monte Carlo
 
 `config/uncertainty.yaml` is the most intellectually demanding file in the
 framework. Every entry is a claim about how well you know something, and every
 one should be defensible.
 
-## 6.1 Entry format
+## 4.1 Entry format
 
 ```yaml
 drag_coefficient:
@@ -774,7 +480,7 @@ live in `sites.yaml` and are not duplicated per analysis.
 > clipping them. Clipping piles probability mass onto the boundary and biases
 > exactly the distribution tails where requirement margins live.
 
-## 6.2 Justifying your sigmas
+## 4.2 Justifying your sigmas
 
 The shipped values are **defensible starting points, not measurements.**
 Replace each one:
@@ -782,7 +488,7 @@ Replace each one:
 | Parameter | Default σ | How to earn a better number |
 |---|---|---|
 | `dry_mass` | 1.5% | Weigh each section three times; use the observed spread. Then track built-vs-predicted mass all season. |
-| `drag_coefficient` | 7% | Compare OpenRocket vs RocketPy, then **fit from flight data** (Part 8). Expect 2–3% afterward. |
+| `drag_coefficient` | 7% | Compare OpenRocket vs RocketPy, then **fit from flight data** (Part 6). Expect 2–3% afterward. |
 | `motor_total_impulse` | 2% | Manufacturer certification data; thrustcurve.org shows lot-to-lot spread. |
 | `wind_speed_mps` | site file | Historical data for the field and month. NOAA/Iowa State Mesonet have archives. |
 | `main_cd` / `drogue_cd` | 10% | Manufacturer data if published; otherwise keep it wide — this is genuinely uncertain. |
@@ -791,7 +497,7 @@ Replace each one:
 **Cite which version of this file produced any number you put in a report.**
 A reviewer asking "where does 4,440 ft come from" deserves a traceable answer.
 
-## 6.3 Running
+## 4.3 Running
 
 ```bash
 python scripts/run_montecarlo.py -n 1000                    # RocketPy (fast)
@@ -820,7 +526,7 @@ check on the trajectory.
 
 ---
 
-# Part 7 — Reading the output
+# Part 5 — Reading the output
 
 Everything lands in `output/`.
 
@@ -836,7 +542,7 @@ Everything lands in `output/`.
 | `montecarlo_*.csv` | Every case, every input and output — for your own analysis |
 | `montecarlo_*.md` | Report-ready dispersion summary |
 
-## 7.1 The apogee distribution
+## 5.1 The apogee distribution
 
 Read three things: where the **median** sits relative to your declared target;
 whether the **5th–95th percentile band** fits inside the required window; and
@@ -844,7 +550,7 @@ whether the distribution is **skewed** (drag and mass errors both push one way,
 so a mild left skew is normal — which is why the framework recommends the
 median, not the mean, as your declared target).
 
-## 7.2 The landing scatter
+## 5.2 The landing scatter
 
 Points are individual cases; the dashed circle is the 2,500 ft limit
 (requirement 3.10); the ellipse is the 3σ covariance fit. The scatter is
@@ -852,7 +558,7 @@ Points are individual cases; the dashed circle is the 2,500 ft limit
 along the prevailing axis. If any point falls outside the circle, the
 `P(pass)` for requirement 3.10 tells you how often.
 
-## 7.3 The kinetic energy subtlety
+## 5.3 The kinetic energy subtlety
 
 This is a genuine engineering judgement, not a software detail, and it changes
 parachute sizing by a full chute size.
@@ -883,7 +589,7 @@ Sizing to the vertical rate is defensible and conventional. Knowing how little
 margin that leaves is the useful part — and it is a good thing to raise
 yourselves in a review before a panelist raises it for you.
 
-## 7.4 What goes in which report
+## 5.4 What goes in which report
 
 | Handbook bullet | Where it comes from |
 |---|---|
@@ -898,23 +604,23 @@ yourselves in a review before a panelist raises it for you.
 
 ---
 
-# Part 8 — Season workflow
+# Part 6 — Season workflow
 
-## 8.1 Proposal / early PDR
+## 6.1 Proposal / early PDR
 
 Get a vehicle into `vehicle.yaml` even if half the numbers are estimates. Mark
 `status:` honestly. Run `run_nominal.py --ballast both` on every design
 candidate — a motor and airframe trade study is a loop over `motor.search` and
 `airframe.outer_diameter_in`.
 
-## 8.2 PDR
+## 6.2 PDR
 
 Run a 1,000-case Monte Carlo. Report P(in window), not a single apogee. Produce
 the cross-validation report. Be explicit about which uncertainties are estimates
 — nobody expects measured sigmas at PDR, but they do expect you to know which
 are which.
 
-## 8.3 CDR — declaring your target altitude
+## 6.3 CDR — declaring your target altitude
 
 Requirement 2.3 makes this a scored decision, and it is the highest-leverage
 number you will pick all season.
@@ -928,7 +634,7 @@ number you will pick all season.
 Declaring the nominal-run apogee is a common and costly mistake: the nominal
 run is not the center of the distribution once asymmetric effects are included.
 
-## 8.4 Subscale flight
+## 6.4 Subscale flight
 
 Build a subscale `vehicle.yaml` (requirements 2.15, 2.16: minimum E impulse,
 ≤75% of full-scale dimensions). Fly it, then run `fit_cd.py` on the altimeter
@@ -936,7 +642,7 @@ data. You will not get the full-scale drag coefficient from a subscale flight �
 Reynolds numbers differ — but you *will* validate that your whole modeling
 process produces the right answer, which is the real purpose.
 
-## 8.5 Vehicle Demonstration Flight — the important one
+## 6.5 Vehicle Demonstration Flight — the important one
 
 The FRR asks, verbatim:
 
@@ -967,7 +673,7 @@ drag was your dominant uncertainty. **That is how you improve your altitude
 score** — not by simulating more carefully, but by replacing a guess with a
 measurement.
 
-## 8.6 FRR
+## 6.6 FRR
 
 Everything above, using as-built masses. Report measured descent rates from the
 altimeter rather than simulated ones — the KE table in `fit_cd.py` output does
@@ -976,83 +682,14 @@ exactly that story, told quantitatively.
 
 ---
 
-# Part 9 — Troubleshooting
+# Part 7 — Troubleshooting
 
-## 9.1 `ModuleNotFoundError: No module named 'rocketpy'`
+Installation and environment errors — `ModuleNotFoundError`, Java not found, a
+missing OpenRocket jar, Python 3.14 build failures, a slow first run — are
+covered in [Part 3 of the Setup Guide](SETUP_GUIDE.md#part-3--troubleshooting-the-installation).
+This part covers problems that appear once the framework is running.
 
-You are using the system Python instead of the venv. Use
-`.venv\Scripts\python` (Windows) or `.venv/bin/python` (macOS/Linux) — not a
-bare `python`.
-
-If it persists, the venv may not have installed correctly:
-
-```bash
-.venv/bin/python -m pip install -r requirements.txt
-```
-
-## 9.2 Java not found
-
-```
-RuntimeError: No Java 17+ runtime found. OpenRocket 24.12 needs one.
-```
-
-The framework searches the standard install locations automatically. If it
-still fails, either Java is not installed or it is somewhere unusual. Check:
-
-```bash
-java -version
-```
-
-If that fails, install a JDK (§2.2–2.4). If it works but the framework does not
-see it, set `JAVA_HOME` explicitly:
-
-```powershell
-$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot"   # Windows, this session
-```
-```bash
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64                     # Linux
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)                        # macOS
-```
-
-To make it permanent on Windows, use System Properties → Environment Variables.
-
-**Java 11 or older will not work.** OpenRocket 24.12 requires 17+.
-
-## 9.3 `FileNotFoundError: OpenRocket jar not found`
-
-You skipped step 5, or the download failed. Check the size — a failed download
-often leaves a small HTML error page:
-
-```bash
-ls -l vendor/OpenRocket-24.12.jar     # should be ~80 MB
-```
-
-Re-download with the command in §2.2–2.4. On Windows remember `curl.exe`, not
-`curl`.
-
-## 9.4 `UnsupportedClassVersionError`
-
-Your Java is too old. Version 17 or newer is required. Check with
-`java -version` and install a newer JDK.
-
-## 9.5 Python 3.14 problems
-
-If installation fails with build errors on numpy, scipy, or netCDF4, check your
-version:
-
-```bash
-python -V
-```
-
-If it says 3.14, that is the cause. Install 3.12 or 3.13 and rebuild the venv:
-
-```bash
-rm -rf .venv                       # rmdir /s /q .venv   on Windows
-py -3.13 -m venv .venv             # python3.13 -m venv .venv  elsewhere
-.venv/bin/python -m pip install -r requirements.txt
-```
-
-## 9.6 Monte Carlo cases fail
+## 7.1 Monte Carlo cases fail
 
 The script reports failures and the most common errors rather than crashing:
 
@@ -1065,14 +702,14 @@ A handful of failures out of hundreds is usually a physically extreme sample
 failures means a dispersion is too wide or a configuration is wrong. Inspect
 `montecarlo_*.csv` — failed rows carry an `error` column.
 
-## 9.7 The simulation aborts immediately
+## 7.2 The simulation aborts immediately
 
 Symptoms: apogee of 0, `Simulation abort` in the events list. Almost always the
 motor is not attached to the flight configuration — check that `motor.search`
 matches a real designation with `list_motors.py`, and that
 `mount_inner_diameter_in` is large enough for the motor's actual diameter.
 
-## 9.8 Parachutes deploy at apogee in RocketPy
+## 7.3 Parachutes deploy at apogee in RocketPy
 
 If the main deploys immediately at apogee instead of at its set altitude, the
 atmosphere model is degenerate. This is fixed in the framework
@@ -1081,34 +718,16 @@ atmosphere model is degenerate. This is fixed in the framework
 atmosphere, which makes barometric height meaningless and fires every
 altitude-triggered parachute the moment the rocket noses over.
 
-## 9.9 Descent rates from real altimeter data look absurd
+## 7.4 Descent rates from real altimeter data look absurd
 
 If measured descent rates come out at 60+ fps under a large main, you are
 differentiating noisy barometric data point-by-point. A few feet of baro noise
 at 20 Hz is roughly 100 fps of noise in every finite difference. The framework
 fits a straight line over each descent phase instead. Keep it that way.
 
-## 9.10 The first run is slow
-
-Roughly 30 seconds is normal — the JVM starts and OpenRocket loads its motor
-database and 5,231 component presets. Subsequent simulations in the same
-process take about 0.7 s. Monte Carlo pays this cost once per worker process,
-not once per sample.
-
-## 9.11 Getting a clean slate
-
-```bash
-rm -rf .venv output/*
-py -3.13 -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt
-.venv/Scripts/python scripts/run_nominal.py
-```
-
-The `vendor/*.jar` and your `config/` files are untouched by this.
-
 ---
 
-# Part 10 — Command reference
+# Part 8 — Command reference
 
 ### `run_nominal.py`
 
@@ -1178,10 +797,7 @@ Exit code 0 if no requirement FAILs, 1 otherwise — usable in CI.
 # Appendix A — Cheat sheet
 
 ```bash
-# Setup (once)
-py -3.13 -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-curl.exe -L -o vendor\OpenRocket-24.12.jar https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
+# Setup (once): see SETUP_GUIDE.md
 
 # Daily use
 python scripts/run_nominal.py --ballast both      # design check

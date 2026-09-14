@@ -3,9 +3,9 @@
 OpenRocket **and** RocketPy driven from one vehicle definition, with Monte Carlo
 dispersion and automated USLI requirement checking.
 
-Built against the *2027 Student Launch Handbook & Request for Proposal*
-(`../2026_2027/2027-sli-handbook.pdf`). Every requirement check cites its
-handbook paragraph. **The college/university ruleset is implemented**, not the
+Built against the *2027 Student Launch Handbook & Request for Proposal*, which
+NASA publishes at <https://www.nasa.gov/stem/studentlaunch/home/index.html>.
+Every requirement check cites its handbook paragraph. **The college/university ruleset is implemented**, not the
 middle/high-school one — the altitude window and impulse limit differ between them.
 
 ---
@@ -58,12 +58,18 @@ apogee — which is exactly what the req 2.3 altitude score pays out on.
 
 ## Documentation
 
-Two companion documents live in [`docs/`](docs/):
+Four companion documents live in [`docs/`](docs/):
 
-- **[Setup and User Guide](docs/SETUP_AND_USER_GUIDE.md)** — installation on
-  Windows/macOS/Linux from nothing, a guided first run, how to define your
-  vehicle, how to read the output, the season workflow, and troubleshooting.
-  Written for someone who has never used a Python virtual environment.
+- **[Setup Guide](docs/SETUP_GUIDE.md)** — what the framework is and why,
+  installation on Windows/macOS/Linux from nothing, a verification run, and
+  installation troubleshooting. Written for someone who has never used a Python
+  virtual environment.
+- **[User Guide](docs/USER_GUIDE.md)** — a guided first run, how to define
+  your vehicle, launch sites, Monte Carlo dispersion, how to read the output,
+  the season workflow, troubleshooting, and a command reference.
+- **[Framework Tour](docs/FRAMEWORK_TOUR.md)** — a guided tour of how the code
+  is structured, for new team members: read a piece, run it, break it on
+  purpose, and finish by contributing a real requirement check.
 - **[Flight Dynamics Background](docs/FLIGHT_DYNAMICS.md)** — the physics both
   tools implement, with working equations and full derivations: Barrowman
   normal force and CP, the drag buildup, static and dynamic stability, the
@@ -94,7 +100,9 @@ curl -L -o vendor/OpenRocket-24.12.jar \
 ```
 
 `JAVA_HOME` is auto-detected; set it manually only if you have an unusual layout.
-Verify everything with `python scripts/run_nominal.py`.
+Verify everything with `.venv/Scripts/python scripts/run_nominal.py`
+(`.venv/bin/python` on macOS/Linux). Elsewhere this README writes `python` for
+the venv's interpreter; a bare system `python` fails with `ModuleNotFoundError`.
 
 ---
 
