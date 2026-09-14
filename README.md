@@ -80,7 +80,9 @@ Four companion documents live in [`docs/`](docs/):
 
 ## Setup
 
-Requires **Python 3.12 or 3.13** (not 3.14 yet) and a **Java 17+ JDK**.
+Requires **Git**, **Python 3.12 or 3.13** (not 3.14 yet), and a **Java 17+ JDK**.
+Full walkthrough, including what each piece is for:
+[`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
 
 **Windows (PowerShell)**
 
@@ -88,12 +90,15 @@ Requires **Python 3.12 or 3.13** (not 3.14 yet) and a **Java 17+ JDK**.
 # 1. Java (needed for the headless OpenRocket engine)
 winget install Microsoft.OpenJDK.17
 
-# 2. Python environment
-cd sim
+# 2. The project
+git clone https://github.com/DrJayBee51/nasa-sli-sim.git
+cd nasa-sli-sim
+
+# 3. Python environment
 py -3.13 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 
-# 3. The OpenRocket engine (80 MB, not committed)
+# 4. The OpenRocket engine (80 MB, not committed)
 New-Item -ItemType Directory -Force vendor | Out-Null
 curl.exe -L -o vendor\OpenRocket-24.12.jar `
   https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
@@ -106,19 +111,22 @@ curl.exe -L -o vendor\OpenRocket-24.12.jar `
 brew install --cask temurin17          # macOS
 # sudo apt install openjdk-17-jdk      # Linux
 
-# 2. Python environment
-cd sim
+# 2. The project
+git clone https://github.com/DrJayBee51/nasa-sli-sim.git
+cd nasa-sli-sim
+
+# 3. Python environment
 python3.13 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 
-# 3. The OpenRocket engine (80 MB, not committed)
+# 4. The OpenRocket engine (80 MB, not committed)
 mkdir -p vendor
 curl -L -o vendor/OpenRocket-24.12.jar \
   https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
 ```
 
 Note `curl.exe` in the PowerShell block, not `curl` — the bare word is an alias
-for `Invoke-WebRequest`. If step 3 fails with
+for `Invoke-WebRequest`. If step 4 fails with
 `curl: (35) schannel: ... CRYPT_E_NO_REVOCATION_CHECK`, you are probably on a
 managed network that blocks certificate revocation checks; see
 [§3.4 of the Setup Guide](docs/SETUP_GUIDE.md#34-curl-35-schannel--crypt_e_no_revocation_check).
