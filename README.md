@@ -82,25 +82,49 @@ Four companion documents live in [`docs/`](docs/):
 
 Requires **Python 3.12 or 3.13** (not 3.14 yet) and a **Java 17+ JDK**.
 
-```bash
+**Windows (PowerShell)**
+
+```powershell
 # 1. Java (needed for the headless OpenRocket engine)
-winget install Microsoft.OpenJDK.17          # Windows
-# brew install --cask temurin17              # macOS
-# sudo apt install openjdk-17-jdk            # Linux
+winget install Microsoft.OpenJDK.17
 
 # 2. Python environment
 cd sim
 py -3.13 -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt     # Windows
-# .venv/bin/python -m pip install -r requirements.txt       # macOS/Linux
+.venv\Scripts\python -m pip install -r requirements.txt
 
 # 3. The OpenRocket engine (80 MB, not committed)
+New-Item -ItemType Directory -Force vendor | Out-Null
+curl.exe -L -o vendor\OpenRocket-24.12.jar `
+  https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
+```
+
+**macOS / Linux (bash)**
+
+```bash
+# 1. Java (needed for the headless OpenRocket engine)
+brew install --cask temurin17          # macOS
+# sudo apt install openjdk-17-jdk      # Linux
+
+# 2. Python environment
+cd sim
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+
+# 3. The OpenRocket engine (80 MB, not committed)
+mkdir -p vendor
 curl -L -o vendor/OpenRocket-24.12.jar \
   https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
 ```
 
+Note `curl.exe` in the PowerShell block, not `curl` — the bare word is an alias
+for `Invoke-WebRequest`. If step 3 fails with
+`curl: (35) schannel: ... CRYPT_E_NO_REVOCATION_CHECK`, you are probably on a
+managed network that blocks certificate revocation checks; see
+[§3.4 of the Setup Guide](docs/SETUP_GUIDE.md#34-curl-35-schannel--crypt_e_no_revocation_check).
+
 `JAVA_HOME` is auto-detected; set it manually only if you have an unusual layout.
-Verify everything with `.venv/Scripts/python scripts/run_nominal.py`
+Verify everything with `.venv\Scripts\python scripts\run_nominal.py`
 (`.venv/bin/python` on macOS/Linux). Elsewhere this README writes `python` for
 the venv's interpreter; a bare system `python` fails with `ModuleNotFoundError`.
 

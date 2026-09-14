@@ -297,6 +297,10 @@ The `vendor` folder does not exist in a fresh clone, hence the first line.
 Note `curl.exe`, not `curl` — in PowerShell the bare word is an alias for
 `Invoke-WebRequest`, which will not work here.
 
+If this fails with `curl: (35) schannel: ... CRYPT_E_NO_REVOCATION_CHECK`, you
+are likely on a managed or corporate network; see
+[§3.4](#34-curl-35-schannel--crypt_e_no_revocation_check) for the fix.
+
 Verify the size is about 80 MB:
 
 ```powershell
@@ -466,12 +470,73 @@ Re-download with the command in §2.3–2.5. On Windows remember `curl.exe`, not
 (`mkdir -p vendor`, or `New-Item -ItemType Directory -Force vendor` in
 PowerShell).
 
-## 3.4 `UnsupportedClassVersionError`
+If the download itself fails with a certificate error, see
+[§3.4](#34-curl-35-schannel--crypt_e_no_revocation_check).
+
+## 3.4 `curl: (35) schannel: ... CRYPT_E_NO_REVOCATION_CHECK`
+
+Windows only, and it is a network problem rather than a project one. The full
+error from step 5 reads:
+
+```
+curl: (35) schannel: next InitializeSecurityContext failed:
+CRYPT_E_NO_REVOCATION_CHECK (0x80092012) - The revocation function was
+unable to check revocation for the certificate.
+```
+
+`curl.exe` uses Windows' own TLS stack (schannel), which tries to confirm that
+GitHub's certificate has not been revoked. On a managed or corporate network
+that check often cannot complete — the connection is inspected by a proxy, or
+outbound access to the revocation endpoints (CRL/OCSP) is blocked — and
+schannel treats "could not check" as fatal.
+
+Download with `Invoke-WebRequest` instead. It uses .NET's TLS stack, which does
+not fail the connection when the revocation endpoint is unreachable:
+
+```powershell
+New-Item -ItemType Directory -Force vendor | Out-Null
+$ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest `
+  -Uri "https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar" `
+  -OutFile "vendor\OpenRocket-24.12.jar"
+```
+
+The `$ProgressPreference` line is not cosmetic — the progress bar slows large
+downloads substantially. Downloading the jar in a browser and moving it into
+`vendor/` by hand works equally well.
+
+Then confirm you received an archive rather than a proxy error page saved under
+a `.jar` name:
+
+```powershell
+(Get-Item vendor\OpenRocket-24.12.jar).Length              # 83149098
+Get-Content vendor\OpenRocket-24.12.jar -Encoding Byte -TotalCount 4
+```
+
+Those four bytes should be `80 75 3 4` — decimal for `PK\x03\x04`, the ZIP
+header every jar begins with. An HTML error page would start `60 33 100 111`
+(`<!do`). On PowerShell 7 the flag is `-AsByteStream -TotalCount 4` instead of
+`-Encoding Byte`.
+
+> **What this works around.** Revocation checking is a genuine security
+> control: it is how your machine learns a certificate was compromised and
+> withdrawn ahead of its expiry date. Bypassing it is usually reasonable on a
+> network where interception is expected and the failure is an artifact of the
+> proxy, but it does mean trusting the network instead of verifying the
+> certificate. If you are *not* on a managed network, find out why the check
+> fails before routing around it.
+>
+> The size and header check above confirms the file is a well-formed archive.
+> It does not confirm the file is the authentic upstream release. If the
+> OpenRocket release page publishes a checksum for this jar, compare it with
+> `(Get-FileHash vendor\OpenRocket-24.12.jar -Algorithm SHA256).Hash`.
+
+## 3.5 `UnsupportedClassVersionError`
 
 Your Java is too old. Version 17 or newer is required. Check with
 `java -version` and install a newer JDK.
 
-## 3.5 Python 3.14 problems
+## 3.6 Python 3.14 problems
 
 If installation fails with build errors on numpy, scipy, or netCDF4, check your
 version:
@@ -488,14 +553,14 @@ py -3.13 -m venv .venv             # python3.13 -m venv .venv  elsewhere
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-## 3.6 The first run is slow
+## 3.7 The first run is slow
 
 Roughly 30 seconds is normal — the JVM starts and OpenRocket loads its motor
 database and 5,231 component presets. Subsequent simulations in the same
 process take about 0.7 s. Monte Carlo pays this cost once per worker process,
 not once per sample.
 
-## 3.7 Getting a clean slate
+## 3.8 Getting a clean slate
 
 ```bash
 rm -rf .venv output/*
