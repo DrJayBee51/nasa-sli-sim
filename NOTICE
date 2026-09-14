@@ -1,0 +1,18 @@
+Third-party and government material included in or used by this repository.
+
+NASA-STD-7009B, Standard for Models and Simulations
+  docs/NASA-STD-7009B-Final-3-5-2024.pdf
+  A United States Government work, published by the Office of the NASA Chief
+  Engineer (approved 2024-03-05). Not covered by this repository's MIT license.
+
+2027 Student Launch Handbook & Request for Proposal
+  Not included here. Published by NASA at
+  https://www.nasa.gov/stem/studentlaunch/home/index.html
+  Every requirement check in slisim/requirements.py cites its paragraph.
+
+OpenRocket 24.12
+  Not included here; downloaded during setup (see docs/SETUP_GUIDE.md).
+  GNU GPL v3. The framework drives it as a separate program through JPype.
+
+RocketPy, and the rest of the Python dependencies in requirements.txt
+  Installed from PyPI, each under its own license. RocketPy is MIT.
