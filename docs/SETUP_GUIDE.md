@@ -440,15 +440,22 @@ On Linux, use your distribution's package or the download at
 **Open the project:** File → Open Folder → the `nasa-sli-sim` folder you
 cloned. Open the *folder*, not a single file, or nothing below will work.
 
-**Install these extensions** (Ctrl+Shift+X, then search by name):
+**Install these extensions.** Press Ctrl+Shift+X and paste the **ID** into the
+search box — the marketplace is full of near-identical names, and the ID is
+exact:
 
-| Extension | Why |
-|---|---|
-| **Python** (Microsoft) | Interpreter selection and the debugger. Nothing works without it |
-| **Pylance** (Microsoft) | Autocomplete and type hints. Usually installs with Python |
-| **YAML** (Red Hat) | Validates `vehicle.yaml`, `sites.yaml`, and `uncertainty.yaml` as you type, so an indentation slip surfaces immediately instead of as a confusing Python error |
-| **Rainbow CSV** | Colors the Monte Carlo output columns, so a 1,000-row CSV is readable without Excel |
-| **GitLens** | Shows who changed each line and when — useful on a team where several people edit the same config |
+| Extension | ID | Publisher | Why |
+|---|---|---|---|
+| Python | `ms-python.python` | Microsoft | Interpreter selection and the debugger. Nothing works without it |
+| Pylance | `ms-python.vscode-pylance` | Microsoft | Autocomplete and type hints. Usually installs with Python |
+| YAML | `redhat.vscode-yaml` | Red Hat | Validates `vehicle.yaml`, `sites.yaml`, and `uncertainty.yaml` as you type, so an indentation slip surfaces immediately instead of as a confusing Python error |
+| Rainbow CSV | `mechatroner.rainbow-csv` | mechatroner | Colors the Monte Carlo output columns, so a 1,000-row CSV is readable without Excel |
+| GitLens | `eamodio.gitlens` | GitKraken | Shows who changed each line and when — useful on a team where several people edit the same config |
+
+Two to watch: "GitLens — Git supercharged" is the one from **GitKraken** with
+tens of millions of installs, not the similarly named forks beneath it, and it
+will offer a paid trial — everything here works on the free tier. The Python
+extension should likewise be Microsoft's.
 
 **Point it at the project's Python.** Press Ctrl+Shift+P, type
 `Python: Select Interpreter`, and choose the entry containing `.venv`. It is
