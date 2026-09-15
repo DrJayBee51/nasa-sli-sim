@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import math
 import os
+import re
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -52,10 +54,71 @@ _JAVA_SEARCH = [
 ]
 
 
+MIN_JAVA_MAJOR = 17
+
+
+def _major_from_version(version: str) -> int | None:
+    """Major version from a Java version string.
+
+    Handles both schemes: "17.0.20.1" -> 17, and the pre-9 "1.8.0_402" -> 8.
+    """
+    m = re.match(r"(\d+)(?:\.(\d+))?", version.strip())
+    if not m:
+        return None
+    major = int(m.group(1))
+    if major == 1 and m.group(2):      # 1.8.0_402 style
+        return int(m.group(2))
+    return major
+
+
+def java_major(home: str | Path) -> int | None:
+    """Major Java version of the runtime at `home`, or None if undeterminable.
+
+    Checked in order of cost: the `release` file every modern distribution
+    ships, then asking the runtime itself.  Returning None means "cannot tell",
+    and callers treat that as acceptable rather than rejecting a JDK that may
+    be perfectly good.
+    """
+    home = Path(home)
+
+    release = home / "release"
+    if release.is_file():
+        try:
+            for line in release.read_text(errors="ignore").splitlines():
+                if line.startswith("JAVA_VERSION="):
+                    return _major_from_version(line.split("=", 1)[1].strip().strip('"'))
+        except OSError:
+            pass
+
+    java = home / "bin" / ("java.exe" if os.name == "nt" else "java")
+    if java.is_file():
+        try:
+            # -version writes to stderr on every JVM old enough to matter here.
+            proc = subprocess.run([str(java), "-version"], capture_output=True,
+                                  text=True, timeout=15)
+            m = re.search(r'version "([^"]+)"', (proc.stderr or "") + (proc.stdout or ""))
+            if m:
+                return _major_from_version(m.group(1))
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    return None
+
+
 def find_java_home() -> str | None:
-    """Locate a JDK 17+ so students never have to set JAVA_HOME by hand."""
-    if os.environ.get("JAVA_HOME") and Path(os.environ["JAVA_HOME"], "bin").exists():
-        return os.environ["JAVA_HOME"]
+    """Locate a JDK 17+ so students never have to set JAVA_HOME by hand.
+
+    An existing JAVA_HOME is honored but *verified*: a machine with an older
+    Java left over from some other tool would otherwise send that version to
+    JPype, and OpenRocket 24.12 fails deep inside the JVM with
+    UnsupportedClassVersionError instead of anything actionable.  A JAVA_HOME
+    that is too old is skipped in favor of a newer JDK found on disk.
+    """
+    env_home = os.environ.get("JAVA_HOME")
+    if env_home and Path(env_home, "bin").exists():
+        major = java_major(env_home)
+        if major is None or major >= MIN_JAVA_MAJOR:
+            return env_home
 
     candidates: list[Path] = []
     for root in _JAVA_SEARCH:
@@ -93,10 +156,26 @@ def ensure_jvm(jar_path: str | Path | None = None, heap: str = "2g",
     if _JVM_STARTED:
         return _or
 
-    if not os.environ.get("JAVA_HOME"):
-        home = find_java_home()
-        if home:
-            os.environ["JAVA_HOME"] = home
+    # Resolve JAVA_HOME on every start, not just when it is unset: an existing
+    # value may point at a Java too old for OpenRocket, and JPype would prefer
+    # it over a perfectly good newer JDK sitting next to it.
+    stale_note = ""
+    home = find_java_home()
+    if home:
+        os.environ["JAVA_HOME"] = home
+    else:
+        env_home = os.environ.get("JAVA_HOME")
+        env_major = java_major(env_home) if env_home else None
+        if env_major is not None and env_major < MIN_JAVA_MAJOR:
+            # Drop it for this process only, so JPype can look elsewhere (the
+            # Windows registry, PATH) instead of loading a JVM we know is too
+            # old.  The user's own environment is untouched.
+            os.environ.pop("JAVA_HOME", None)
+            stale_note = (
+                f"\nJAVA_HOME points at Java {env_major} ({env_home}),"
+                f" which cannot run OpenRocket 24.12.\n"
+                "Set it to a JDK 17+ install, or remove it if another is on PATH."
+            )
 
     import jpype
     import jpype.imports
@@ -125,9 +204,26 @@ def ensure_jvm(jar_path: str | Path | None = None, heap: str = "2g",
                 "  Windows: winget install Microsoft.OpenJDK.17\n"
                 "  macOS  : brew install --cask temurin17\n"
                 "  Linux  : sudo apt install openjdk-17-jdk\n"
-                "Then re-run, or set JAVA_HOME explicitly."
+                "Then re-run, or set JAVA_HOME explicitly." + stale_note
             ) from exc
         jpype.startJVM(jvm, *args, classpath=[str(jar)], convertStrings=True)
+
+    # Whatever JPype ended up loading, check it before touching OpenRocket's
+    # classes.  Otherwise a too-old JVM surfaces as UnsupportedClassVersionError
+    # from deep inside the JVM, which tells a student nothing.
+    running = str(jpype.java.lang.System.getProperty("java.specification.version"))
+    running_major = _major_from_version(running)
+    if running_major is not None and running_major < MIN_JAVA_MAJOR:
+        raise RuntimeError(
+            f"Java {running_major} is running, but OpenRocket 24.12 needs "
+            f"{MIN_JAVA_MAJOR} or newer.\n"
+            f"  JVM: {jpype.getDefaultJVMPath()}\n"
+            "  Windows: winget install Microsoft.OpenJDK.17\n"
+            "  macOS  : brew install --cask temurin17\n"
+            "  Linux  : sudo apt install openjdk-17-jdk\n"
+            "Then point JAVA_HOME at it, or remove JAVA_HOME if a newer JDK is "
+            "already on PATH." + stale_note
+        )
 
     core = jpype.JPackage("info").openrocket.core
     if not core.startup.OpenRocketCore.isInitialized():

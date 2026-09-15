@@ -597,8 +597,42 @@ header every jar begins with. An HTML error page would start `60 33 100 111`
 
 ## 3.5 `UnsupportedClassVersionError`
 
-Your Java is too old. Version 17 or newer is required. Check with
-`java -version` and install a newer JDK.
+```
+info/openrocket/core/startup/OpenRocketCore has been compiled by a more recent
+version of the Java Runtime (class file version 61.0), this version of the Java
+Runtime only recognizes class file versions up to 55.0
+```
+
+Java 17 compiles to class file version 61; 55 is Java 11. So the JVM that
+actually loaded is too old, whatever `java -version` says.
+
+```powershell
+java -version            # the Java on PATH
+echo $env:JAVA_HOME      # the Java the JVM launcher prefers
+```
+
+**If `java -version` is under 17**, install a newer JDK (§2.3–2.5) and reopen
+the terminal.
+
+**If `java -version` says 17 but the error persists**, `JAVA_HOME` points at an
+older install — often left behind by some unrelated tool — and it wins over
+PATH. Point it at the Java that works:
+
+```powershell
+$env:JAVA_HOME = (Get-Item (Get-Command java).Source).Directory.Parent.FullName
+```
+
+That lasts for the current terminal. To keep it:
+
+```powershell
+[Environment]::SetEnvironmentVariable("JAVA_HOME", $env:JAVA_HOME, "User")
+```
+
+The framework checks `JAVA_HOME`'s version and steps around it when it is too
+old, so this error means no newer JDK was found either. It should now report
+that in plain language rather than as a Java stack trace; if you see the raw
+`UnsupportedClassVersionError` above, you are on an older version of the
+framework — `git pull`.
 
 ## 3.6 Python 3.14 problems
 
