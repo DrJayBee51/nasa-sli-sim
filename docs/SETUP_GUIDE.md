@@ -224,7 +224,21 @@ track empty directories and their contents are too large or are generated:
 
 ## 2.3 Windows
 
-Open **PowerShell**. You do not need Administrator except where noted.
+Open **PowerShell**, or **Git Bash** if you prefer it. Both work, and both are
+shown below wherever they differ. You do not need Administrator except where
+noted.
+
+> **Two shells, two spellings.** Only two differences matter here:
+>
+> - **Paths:** PowerShell takes `\`, Git Bash takes `/`. Git Bash also spells
+>   drives `/c/Users/...` rather than `C:\Users\...`.
+> - **Environment variables:** `$env:NAME = "value"` in PowerShell,
+>   `export NAME="value"` in Git Bash.
+>
+> What does *not* change on Windows is where Python lives: always
+> `.venv\Scripts\` (or `.venv/Scripts/`), never `.venv/bin/`. The `bin` layout
+> is macOS and Linux only — a common mix-up when copying a command from the
+> wrong section.
 
 **Step 1 — Python 3.13**
 
@@ -232,7 +246,8 @@ Open **PowerShell**. You do not need Administrator except where noted.
 winget install --id Python.Python.3.13 --scope user
 ```
 
-Close and reopen PowerShell, then verify:
+`winget` is a program, so that line is identical in Git Bash. Close and reopen
+the terminal, then verify (also identical in both):
 
 ```powershell
 py -0p
@@ -259,8 +274,17 @@ reopening the terminal, see [§3.2](#32-java-not-found).
 
 **Step 3 — Create the virtual environment**
 
+PowerShell:
+
 ```powershell
 cd C:\path\to\nasa-sli-sim
+py -3.13 -m venv .venv
+```
+
+Git Bash:
+
+```bash
+cd /c/path/to/nasa-sli-sim
 py -3.13 -m venv .venv
 ```
 
@@ -270,9 +294,18 @@ address bar. Every later command assumes the terminal is still in this folder.
 
 **Step 4 — Install the Python packages**
 
+PowerShell:
+
 ```powershell
 .venv\Scripts\python -m pip install --upgrade pip
 .venv\Scripts\python -m pip install -r requirements.txt
+```
+
+Git Bash:
+
+```bash
+.venv/Scripts/python -m pip install --upgrade pip
+.venv/Scripts/python -m pip install -r requirements.txt
 ```
 
 This downloads roughly 200 MB and takes a few minutes.
@@ -283,33 +316,41 @@ This downloads roughly 200 MB and takes a few minutes.
 > execution-policy problems entirely. Every command in this guide uses the
 > direct form. If you *want* activation, run
 > `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then
-> `.venv\Scripts\Activate.ps1`.
->
-> **Using Git Bash instead of PowerShell?** Use forward slashes —
-> `.venv/Scripts/python` — or activate with `source .venv/Scripts/activate`.
+> `.venv\Scripts\Activate.ps1` — or in Git Bash,
+> `source .venv/Scripts/activate`. VS Code's terminal does this for you
+> ([§2.6](#26-visual-studio-code-recommended)).
 
 **Step 5 — Download the OpenRocket engine**
+
+The `vendor` folder does not exist in a fresh clone, so create it first.
+
+PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force vendor | Out-Null
 curl.exe -L -o vendor\OpenRocket-24.12.jar `
   https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
+(Get-Item vendor\OpenRocket-24.12.jar).Length / 1MB      # expect about 80
 ```
-
-The `vendor` folder does not exist in a fresh clone, hence the first line.
 
 Note `curl.exe`, not `curl` — in PowerShell the bare word is an alias for
 `Invoke-WebRequest`, which will not work here.
 
-If this fails with `curl: (35) schannel: ... CRYPT_E_NO_REVOCATION_CHECK`, you
-are likely on a managed or corporate network; see
-[§3.4](#34-curl-35-schannel--crypt_e_no_revocation_check) for the fix.
+Git Bash:
 
-Verify the size is about 80 MB:
-
-```powershell
-(Get-Item vendor\OpenRocket-24.12.jar).Length / 1MB
+```bash
+mkdir -p vendor
+curl -L -o vendor/OpenRocket-24.12.jar \
+  https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
+ls -l vendor/OpenRocket-24.12.jar                        # expect ~83,000,000 bytes
 ```
+
+In Git Bash `curl` is the real program, so no `.exe` is needed, and the line
+continuation is `\` rather than a backtick.
+
+If either fails with `curl: (35) schannel: ... CRYPT_E_NO_REVOCATION_CHECK`,
+you are likely on a managed or corporate network; see
+[§3.4](#34-curl-35-schannel--crypt_e_no_revocation_check) for the fix.
 
 ## 2.4 macOS
 
@@ -444,11 +485,16 @@ may open with subtly different results.
 Run the built-in nominal analysis:
 
 ```powershell
-.venv\Scripts\python scripts\run_nominal.py          # Windows
+.venv\Scripts\python scripts\run_nominal.py          # Windows, PowerShell
 ```
 ```bash
+.venv/Scripts/python scripts/run_nominal.py          # Windows, Git Bash
 .venv/bin/python scripts/run_nominal.py              # macOS / Linux
 ```
+
+Windows keeps the interpreter in `Scripts`, whichever shell you use; `bin` is
+macOS and Linux. Inside VS Code's terminal, with the interpreter selected, a
+plain `python scripts/run_nominal.py` works too.
 
 The first run takes about 30 seconds — most of that is the JVM starting and
 OpenRocket loading its 1,088-motor database. You should see a comparison table,
@@ -509,12 +555,20 @@ If that fails, install a JDK (§2.3–2.5). If it works but the framework does n
 see it, set `JAVA_HOME` explicitly:
 
 ```powershell
-$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot"   # Windows, this session
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot"   # Windows, PowerShell
 ```
 ```bash
+export JAVA_HOME="C:/Program Files/Microsoft/jdk-17.0.20.101-hotspot"   # Windows, Git Bash
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64                     # Linux
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)                        # macOS
 ```
+
+Each of those lasts for the current terminal only.
+
+> **Git Bash: use the Windows form of the path.** `C:/Program Files/...`, not
+> the `/c/Program Files/...` that Git Bash itself prints. Python and the JVM
+> are Windows programs and cannot see the `/c/` form, so that spelling looks
+> right and silently does nothing. `cygpath -m` converts one to the other.
 
 To make it permanent on Windows, use System Properties → Environment Variables.
 
@@ -525,12 +579,15 @@ To make it permanent on Windows, use System Properties → Environment Variables
 You skipped step 5, or the download failed. Check the size — a failed download
 often leaves a small HTML error page:
 
+```powershell
+(Get-Item vendor\OpenRocket-24.12.jar).Length / 1MB   # PowerShell; expect about 80
+```
 ```bash
-ls -l vendor/OpenRocket-24.12.jar     # should be ~80 MB
+ls -l vendor/OpenRocket-24.12.jar                     # Git Bash, macOS, Linux
 ```
 
-Re-download with the command in §2.3–2.5. On Windows remember `curl.exe`, not
-`curl`. A fresh clone has no `vendor/` folder at all, so create it first
+Re-download with the command in §2.3–2.5. In PowerShell remember `curl.exe`,
+not `curl`; in Git Bash plain `curl` is correct. A fresh clone has no `vendor/` folder at all, so create it first
 (`mkdir -p vendor`, or `New-Item -ItemType Directory -Force vendor` in
 PowerShell).
 
@@ -610,6 +667,10 @@ actually loaded is too old, whatever `java -version` says.
 java -version            # the Java on PATH
 echo $env:JAVA_HOME      # the Java the JVM launcher prefers
 ```
+```bash
+java -version            # Git Bash, macOS, Linux
+echo "$JAVA_HOME"
+```
 
 **If `java -version` is under 17**, install a newer JDK (§2.3–2.5) and reopen
 the terminal.
@@ -621,12 +682,22 @@ PATH. Point it at the Java that works:
 ```powershell
 $env:JAVA_HOME = (Get-Item (Get-Command java).Source).Directory.Parent.FullName
 ```
+```bash
+export JAVA_HOME="$(cygpath -m "$(dirname "$(dirname "$(which java)")")")"  # Git Bash
+export JAVA_HOME="$(dirname "$(dirname "$(which java)")")"                  # macOS, Linux
+```
 
-That lasts for the current terminal. To keep it:
+`cygpath -m` is what turns Git Bash's `/c/Program Files/...` into the
+`C:/Program Files/...` that Windows programs understand; without it the
+variable is set to a path Python cannot see.
+
+That lasts for the current terminal. To keep it on Windows:
 
 ```powershell
 [Environment]::SetEnvironmentVariable("JAVA_HOME", $env:JAVA_HOME, "User")
 ```
+
+On macOS or Linux, add the `export` line to `~/.zshrc` or `~/.bashrc`.
 
 The framework checks `JAVA_HOME`'s version and steps around it when it is too
 old, so this error means no newer JDK was found either. It should now report
@@ -645,10 +716,15 @@ python -V
 
 If it says 3.14, that is the cause. Install 3.12 or 3.13 and rebuild the venv:
 
+```powershell
+Remove-Item -Recurse -Force .venv                        # Windows, PowerShell
+py -3.13 -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+```
 ```bash
-rm -rf .venv                       # rmdir /s /q .venv   on Windows
-py -3.13 -m venv .venv             # python3.13 -m venv .venv  elsewhere
-.venv/bin/python -m pip install -r requirements.txt
+rm -rf .venv                                             # Git Bash, macOS, Linux
+py -3.13 -m venv .venv                                   # python3.13 elsewhere
+.venv/Scripts/python -m pip install -r requirements.txt  # .venv/bin on macOS/Linux
 ```
 
 ## 3.7 The first run is slow
@@ -659,6 +735,17 @@ process take about 0.7 s. Monte Carlo pays this cost once per worker process,
 not once per sample.
 
 ## 3.8 Getting a clean slate
+
+PowerShell:
+
+```powershell
+Remove-Item -Recurse -Force .venv, output\*
+py -3.13 -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python scripts\run_nominal.py
+```
+
+Git Bash (on macOS and Linux, use `.venv/bin/python` and `python3.13`):
 
 ```bash
 rm -rf .venv output/*

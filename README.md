@@ -125,6 +125,9 @@ curl -L -o vendor/OpenRocket-24.12.jar \
   https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
 ```
 
+On Windows in **Git Bash**, follow the bash block but keep the Windows layout:
+`py -3.13 -m venv .venv`, then `.venv/Scripts/python` — `Scripts`, not `bin`.
+
 Note `curl.exe` in the PowerShell block, not `curl` — the bare word is an alias
 for `Invoke-WebRequest`. If step 4 fails with
 `curl: (35) schannel: ... CRYPT_E_NO_REVOCATION_CHECK`, you are probably on a
