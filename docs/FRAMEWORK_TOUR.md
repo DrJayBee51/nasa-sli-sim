@@ -19,6 +19,11 @@ before you run something is most of the value.
 the code on purpose; `git restore <file>` puts it back. Never commit a
 deliberate breakage.
 
+Working in VS Code helps here: its Source Control panel lists every file you
+have modified and shows the exact change side by side, so you can see your
+breakage before undoing it. "Discard Changes" there is the same as
+`git restore`.
+
 The [User Guide](USER_GUIDE.md) explains how to *operate* the framework, and
 [`FLIGHT_DYNAMICS.md`](FLIGHT_DYNAMICS.md) explains the *physics* it implements.
 This document explains the *structure*.

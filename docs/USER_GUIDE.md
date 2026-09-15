@@ -7,7 +7,7 @@ This guide covers using the framework once it is installed: a guided first
 run, defining your vehicle, launch sites, Monte Carlo dispersion, reading the
 output, and how the tools fit the season's milestones. If you have not
 installed it yet, start with the [Setup Guide](SETUP_GUIDE.md). Everything here
-assumes its verification step (§2.7) passes.
+assumes its verification step (§2.8) passes.
 
 Work through Part 1 at a keyboard — it takes about 30 minutes and it is the
 fastest way to understand what the framework does.
@@ -18,11 +18,19 @@ folder, and every result is text in the terminal or a file written to
 [Before you start](SETUP_GUIDE.md#before-you-start-this-is-a-command-line-tool)
 in the Setup Guide if that is unfamiliar.
 
+**Where to type the commands.** The easiest place is the terminal built into
+VS Code (Ctrl+`), because the file tree, the editor, and the commands then
+share one window — you can edit `vehicle.yaml`, run a flight, and open the
+resulting figure without leaving it. Set that up in
+[§2.6 of the Setup Guide](SETUP_GUIDE.md#26-visual-studio-code-recommended).
+Any other terminal works identically; nothing below depends on VS Code.
+
 > **Shorthand.** This guide writes `python` for whichever of
 > `.venv\Scripts\python` (Windows PowerShell), `.venv/Scripts/python` (Git Bash
-> on Windows), or `.venv/bin/python` (macOS/Linux) applies to your machine.
-> Always use the one inside `.venv` — a bare `python` will use your system
-> Python and fail with `ModuleNotFoundError`.
+> on Windows), or `.venv/bin/python` (macOS/Linux) applies to your machine. In
+> VS Code's terminal, with the interpreter selected, a bare `python` already
+> *is* that one — the prompt shows `(.venv)`. Everywhere else, a bare `python`
+> uses your system Python and fails with `ModuleNotFoundError`.
 
 Two further companions: [`FRAMEWORK_TOUR.md`](FRAMEWORK_TOUR.md) walks through
 how the code is structured, and [`FLIGHT_DYNAMICS.md`](FLIGHT_DYNAMICS.md)
@@ -539,7 +547,7 @@ Everything lands in `output/`.
 | `landing_*.png` | Landing scatter against the 2,500 ft radius |
 | `sensitivity_*.png` | What drives apogee |
 | `crossvalidation.md` | Report-ready engine comparison |
-| `montecarlo_*.csv` | Every case, every input and output — for your own analysis |
+| `montecarlo_*.csv` | Every case, every input and output — for your own analysis (the Rainbow CSV extension makes these readable in VS Code) |
 | `montecarlo_*.md` | Report-ready dispersion summary |
 
 ## 5.1 The apogee distribution

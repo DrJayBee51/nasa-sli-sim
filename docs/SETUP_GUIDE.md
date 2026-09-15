@@ -26,8 +26,11 @@ a **terminal**: a text window where you type a command, press Enter, and read
 the text it prints back. Every command in these guides is written out in full,
 so you can copy and paste them.
 
-- **Which terminal:** PowerShell on Windows (Git Bash also works; see
-  [§2.3](#23-windows)), or Terminal on macOS and Linux.
+- **Which terminal:** the one built into VS Code is the easiest, because the
+  file tree, the code, and the commands then share a single window
+  ([§2.6](#26-visual-studio-code-recommended)). Outside VS Code, use PowerShell
+  on Windows (Git Bash also works; see [§2.3](#23-windows)), or Terminal on
+  macOS and Linux. The commands are identical either way.
 - **Run everything from the project folder**, the one you clone in
   [§2.2](#22-get-the-project-files). Commands like `scripts/run_nominal.py`
   only work when the terminal is in that folder. Move there with `cd` at the
@@ -175,6 +178,7 @@ stating it precisely is worth more in a review than overstating it.
 | **A virtual environment** (venv) | An isolated folder of Python packages, so this project's pinned versions cannot break other Python work on your machine, and so everyone on the team has identical versions. |
 | **Java JDK 17 or newer** | OpenRocket is a Java program. The framework runs its real solver headlessly, so a Java runtime must be present. You do not write any Java. |
 | **`OpenRocket-24.12.jar`** | The OpenRocket engine itself, ~80 MB. Not committed to the repository because of its size. |
+| **Visual Studio Code** (recommended) | An editor with a built-in terminal, so the file tree, the code, and the commands share one window. Also gives you a debugger and YAML validation. |
 | **OpenRocket GUI** (optional but recommended) | For opening the `.ork` files the framework generates, and for ordinary design work. |
 
 A note on why a *JDK* rather than just a JRE: modern OpenRocket distributions
@@ -374,14 +378,68 @@ curl -L -o vendor/OpenRocket-24.12.jar \
   https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
 ```
 
-## 2.6 The OpenRocket GUI (optional)
+## 2.6 Visual Studio Code (recommended)
+
+You can run everything from a plain terminal, but VS Code puts the file tree,
+the editor, and a terminal in one window — which matters on a laptop, where
+alt-tabbing between a file browser and a terminal gets old fast.
+
+**Install it:**
+
+```powershell
+winget install --id Microsoft.VisualStudioCode          # Windows
+```
+```bash
+brew install --cask visual-studio-code                  # macOS
+```
+
+On Linux, use your distribution's package or the download at
+<https://code.visualstudio.com/>.
+
+**Open the project:** File → Open Folder → the `nasa-sli-sim` folder you
+cloned. Open the *folder*, not a single file, or nothing below will work.
+
+**Install these extensions** (Ctrl+Shift+X, then search by name):
+
+| Extension | Why |
+|---|---|
+| **Python** (Microsoft) | Interpreter selection and the debugger. Nothing works without it |
+| **Pylance** (Microsoft) | Autocomplete and type hints. Usually installs with Python |
+| **YAML** (Red Hat) | Validates `vehicle.yaml`, `sites.yaml`, and `uncertainty.yaml` as you type, so an indentation slip surfaces immediately instead of as a confusing Python error |
+| **Rainbow CSV** | Colors the Monte Carlo output columns, so a 1,000-row CSV is readable without Excel |
+| **GitLens** | Shows who changed each line and when — useful on a team where several people edit the same config |
+
+**Point it at the project's Python.** Press Ctrl+Shift+P, type
+`Python: Select Interpreter`, and choose the entry containing `.venv`. It is
+normally marked "Recommended". This is the single most important step: without
+it, VS Code uses the system Python and every run fails with
+`ModuleNotFoundError`.
+
+**Open the built-in terminal** with Ctrl+` (the backtick key, above Tab). It
+opens already in the project folder, and it activates `.venv` for you once the
+interpreter is selected — the prompt shows `(.venv)`. Confirm with:
+
+```bash
+python -c "import sys; print(sys.executable)"
+```
+
+The path it prints should be inside `.venv`. If it is not, the interpreter is
+not selected, or the terminal predates the selection — open a new one with the
+`+` in the terminal panel. Every command in these guides can be typed here.
+
+> **Running a script with the ▶ button or F5** works too, and the debugger is
+> worth learning: set a breakpoint, then step through a real flight. The button
+> passes no command-line arguments, though, so anything needing a flag (for
+> example `--ballast both`) is easier in the terminal.
+
+## 2.7 The OpenRocket GUI (optional)
 
 Download the installer for your platform from
 <https://openrocket.info/downloads.html>. **Use version 24.12** so the GUI
 matches the engine the framework drives — otherwise a file the framework writes
 may open with subtly different results.
 
-## 2.7 Verifying the installation
+## 2.8 Verifying the installation
 
 Run the built-in nominal analysis:
 
@@ -421,6 +479,12 @@ The same applies to `No module named 'yaml'` or any other package. You are
 using the system Python instead of the venv. Use `.venv\Scripts\python`
 (Windows PowerShell), `.venv/Scripts/python` (Git Bash on Windows), or
 `.venv/bin/python` (macOS/Linux) — not a bare `python`.
+
+**In VS Code**, this means the interpreter is not the project's. Press
+Ctrl+Shift+P → `Python: Select Interpreter` → the entry containing `.venv`
+([§2.6](#26-visual-studio-code-recommended)), then open a *new* terminal with
+the `+` button; terminals opened earlier keep the old environment. Check which
+one you have with `python -c "import sys; print(sys.executable)"`.
 
 If it persists, the venv may not have installed correctly:
 
