@@ -9,8 +9,10 @@ output, and how the tools fit the season's milestones. If you have not
 installed it yet, start with the [Setup Guide](SETUP_GUIDE.md). Everything here
 assumes its verification step (§2.8) passes.
 
-Work through Part 1 at a keyboard — it takes about 30 minutes and it is the
-fastest way to understand what the framework does.
+Read Part 0 first if git is new to you — it is short, and it is what keeps
+several people editing the same config files from stepping on each other. Then
+work through Part 1 at a keyboard: about 30 minutes, and the fastest way to
+understand what the framework does.
 
 Every step here is a command typed into a terminal and run from the project
 folder, and every result is text in the terminal or a file written to
@@ -40,6 +42,7 @@ explains the physics behind everything here.
 
 ## Table of contents
 
+- [Part 0 — Working with git](#part-0--working-with-git)
 - [Part 1 — Guided first run](#part-1--guided-first-run)
 - [Part 2 — Defining your vehicle](#part-2--defining-your-vehicle)
 - [Part 3 — Launch sites](#part-3--launch-sites)
@@ -50,6 +53,154 @@ explains the physics behind everything here.
 - [Part 8 — Command reference](#part-8--command-reference)
 - [Appendix A — Cheat sheet](#appendix-a--cheat-sheet)
 - [Appendix B — Glossary](#appendix-b--glossary)
+
+---
+
+# Part 0 — Working with git
+
+Read this once before you change anything. Several of you will edit the same
+three config files this season, and git is what keeps that from turning into
+"final_v3_ACTUAL.yaml" passed around on Discord.
+
+## 0.1 What git is doing
+
+Your project folder is an ordinary folder you edit normally. Git adds a
+**history**: a series of snapshots, each with a message saying what changed and
+why. Nothing enters that history unless you put it there, in two deliberate
+steps.
+
+```
+  working tree          staging area            history            GitHub
+  (your files)   --->   (what goes in    --->   (snapshots   --->  (the team's
+                         the next save)          on your           shared copy)
+        edit             git add                 machine)          git push
+                                                 git commit
+```
+
+Two steps rather than one looks fussy, but it means you decide what belongs in
+a snapshot. You can fix three things and record them as three clear commits.
+
+Two habits matter more than any command below:
+
+- **`git status` whenever you are unsure.** It tells you what changed, what is
+  staged, and usually what to type next. It changes nothing, so use it freely.
+- **Commit small and often.** A commit is a point you can return to. Ten small
+  commits are far more useful than one enormous one at 2 a.m. before CDR.
+
+## 0.2 The daily loop
+
+```bash
+git pull                       # start with everyone else's latest work
+# ... edit config/vehicle.yaml, run some analyses ...
+git status                     # what did I change?
+git diff                       # exactly what, line by line
+git add config/vehicle.yaml    # choose what goes in this snapshot
+git commit -m "Raise fin span to 7.5 in for stability margin"
+git push                       # share it
+```
+
+**Pull before you start, push when you stop.** Most git pain comes from
+skipping the first.
+
+**Write messages a teammate can use.** "Raise fin span to 7.5 in for stability
+margin" tells the story; "update" and "stuff" do not. Say *why*, since the
+*what* is already in the diff.
+
+In VS Code, the Source Control panel (Ctrl+Shift+G) does all of this: changed
+files are listed, clicking one shows the diff, `+` stages, the box at the top
+takes the message, and the Sync button pulls and pushes.
+
+## 0.3 Branches
+
+A branch is a separate line of work. The shared one is `main`, and it should
+always be in a state that runs.
+
+Use one whenever you are trying something that might not pan out — a new fin
+geometry, a different motor, a rewrite of the sigmas:
+
+```bash
+git switch -c isabel/fin-trade      # create and move onto it
+# ... work, commit as usual ...
+git push -u origin isabel/fin-trade # first push; later pushes are just `git push`
+```
+
+Name them `yourname/what`, so the branch list stays readable.
+
+When the work is good, merge it into `main` — on GitHub via a pull request,
+which lets someone else look first, or locally:
+
+```bash
+git switch main
+git pull
+git merge isabel/fin-trade
+git push
+```
+
+If it does not pan out, abandon it. `git switch main` and the experiment stays
+out of everyone's way.
+
+## 0.4 When two people edit the same file
+
+Git merges different parts of a file automatically. When two people change the
+*same lines*, it stops and asks, marking the spot like this:
+
+```
+<<<<<<< HEAD
+    height_in: 7.50
+=======
+    height_in: 8.00
+>>>>>>> isabel/fin-trade
+```
+
+Above the `=======` is what was there; below is what is arriving. Delete the
+markers, leave the version you want (or write a third), then:
+
+```bash
+git add config/vehicle.yaml
+git commit
+```
+
+VS Code shows conflicts with "Accept Current / Accept Incoming / Accept Both"
+buttons, which is far easier than editing the markers by hand. A conflict is
+not an error — it is git refusing to guess which rocket you meant.
+
+## 0.5 Undoing things
+
+| Situation | Command |
+|---|---|
+| Discard changes to one file | `git restore config/vehicle.yaml` |
+| Unstage something added by mistake | `git restore --staged <file>` |
+| Fix the last commit's message | `git commit --amend` |
+| Set the work aside, temporarily | `git stash`, then `git stash pop` |
+| See what a file looked like before | `git log -p config/vehicle.yaml` |
+
+`git restore` throws work away permanently, so read `git status` first. Once
+something is committed it is recoverable; before that, it is not.
+
+## 0.6 What not to commit
+
+`.gitignore` already keeps out `.venv/`, `output/`, and the 80 MB OpenRocket
+jar. Everything in `output/` is reproducible from the configs and scripts, so
+committing figures adds weight and conflicts for nothing.
+
+Do commit your config changes — `vehicle.yaml`, `sites.yaml`,
+`uncertainty.yaml` are the team's shared record of the design, and the reason
+anyone can reproduce a number you quote in a review.
+
+Never commit a deliberate breakage. [`FRAMEWORK_TOUR.md`](FRAMEWORK_TOUR.md)
+has you break the framework on purpose; `git restore <file>` puts it back.
+
+## 0.7 The five commands you will actually use
+
+```bash
+git status      # what is going on
+git pull        # get everyone's work
+git add <file>  # choose what to save
+git commit -m "message"
+git push        # share it
+```
+
+Everything else can be looked up when you need it.
 
 ---
 
@@ -807,6 +958,13 @@ Exit code 0 if no requirement FAILs, 1 otherwise — usable in CI.
 ```bash
 # Setup (once): see SETUP_GUIDE.md
 
+# Every session (Part 0)
+git pull                                          # before you start
+git status                                        # what have I changed
+git add config/vehicle.yaml                       # choose what to save
+git commit -m "why this change"
+git push                                          # when you stop
+
 # Daily use
 python scripts/run_nominal.py --ballast both      # design check
 python scripts/list_motors.py --nasa              # pick a motor
@@ -843,6 +1001,11 @@ output/*.ork              open in OpenRocket GUI
 | **Spearman ρ** | Rank correlation; measures monotone association without assuming linearity. |
 | **6-DOF** | Six degrees of freedom: three translations and three rotations. |
 | **venv** | An isolated Python package directory. |
+| **Commit** | One snapshot in the project's history, with a message saying why. |
+| **Staging** | The set of changes you have chosen to put in the next commit (`git add`). |
+| **Branch** | A separate line of work. `main` is the shared one and should always run. |
+| **Remote / origin** | The shared copy on GitHub. `origin` is its default name. |
+| **Pull / push** | Bring the remote's commits down; send yours up. |
 | **JVM / JDK** | Java Virtual Machine / Java Development Kit. OpenRocket is a Java program. |
 | **VDF / PDF** | Vehicle / Payload Demonstration Flight. |
 

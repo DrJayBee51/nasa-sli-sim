@@ -188,7 +188,10 @@ installing a JDK is the dependable route.
 ## 2.2 Get the project files
 
 The project lives in a Git repository. Cloning it, rather than copying a
-folder, means you can pull the team's changes and share your own.
+folder, means you can pull the team's changes and share your own. If git is new
+to you, [Part 0 of the User Guide](USER_GUIDE.md#part-0--working-with-git)
+covers the handful of commands you need; you do not need it to finish this
+setup.
 
 **Install Git** if you do not have it:
 
