@@ -7,6 +7,7 @@ annotated lines, and no reliance on color alone to carry meaning.
 
 from __future__ import annotations
 
+import textwrap
 from pathlib import Path
 
 import matplotlib
@@ -15,6 +16,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
+from . import montecarlo as mc  # noqa: E402
 from . import requirements as rq  # noqa: E402
 from . import units as U  # noqa: E402
 
@@ -162,6 +164,141 @@ def plot_landing_scatter(df: pd.DataFrame, out_dir: Path, ellipse: dict | None =
     _style(ax, f"Landing dispersion, N={len(ok)}   |   {inside.mean():.1%} within limit",
            "East of pad (ft)", "North of pad (ft)")
     ax.legend(fontsize=8, frameon=False, loc="upper left")
+    return _save(fig, out_dir, name)
+
+
+# Panel layout for plot_input_distributions: one row per group, in the same
+# order as config/uncertainty.yaml so the figure reads like the file it came
+# from.  A parameter missing from here still plots, under "Other".
+INPUT_GROUPS: list[tuple[str, tuple[str, ...]]] = [
+    ("Vehicle", ("dry_mass", "cg_shift", "drag_coefficient")),
+    ("Motor", ("motor_total_impulse", "motor_burn_time", "motor_dry_mass")),
+    ("Launch conditions", ("rail_angle_deg", "rail_direction_deg", "wind_speed_mps",
+                           "wind_direction_deg", "temperature_k", "pressure_pa")),
+    ("Recovery", ("drogue_cd", "main_cd", "main_deploy_altitude_ft",
+                  "drogue_deploy_delay_s")),
+]
+
+# Axis units by name suffix.  Parameters declared `relative: true` are sampled
+# as multipliers on the nominal, so they are dimensionless and handled first.
+_UNIT_BY_SUFFIX = {"_deg": "deg", "_mps": "m/s", "_k": "K", "_pa": "Pa",
+                   "_ft": "ft", "_s": "s", "_cd": "x nominal", "_mass": "x nominal"}
+
+
+def _input_unit(param: str, spec: dict | None) -> str:
+    if spec and spec.get("relative"):
+        return "x nominal"
+    for suffix, unit in _UNIT_BY_SUFFIX.items():
+        if param.endswith(suffix):
+            return unit
+    return ""
+
+
+def plot_input_distributions(df: pd.DataFrame, out_dir: Path,
+                             uncertainty: dict | None = None,
+                             engine: str = "rocketpy",
+                             name: str = "input_distributions.png") -> Path:
+    """Histogram per dispersed input, grouped as in config/uncertainty.yaml.
+
+    This is the figure that shows a reviewer *what was actually sampled*, which
+    is the half of a Monte Carlo that dispersion summaries leave out: the output
+    tables say the apogee scattered, this says the inputs did, and by how much.
+    Where the requested sigma is known it is printed beside the observed one --
+    a visible disagreement means the sampler did not do what the YAML asked.
+
+    Parameters held nominal are omitted rather than drawn as a single spike.
+    The caption names the first few so a subset run is self-documenting; the
+    full list belongs in the report body, which has room for it.
+
+    Under `engine="openrocket"` only the launch conditions are plotted: the
+    sampler draws every parameter either way, but `run_openrocket_case` feeds it
+    only those six, so plotting the rest would credit them with scatter they did
+    not cause.
+    """
+    ok = df[df.get("ok", True) == True]  # noqa: E712
+    ins = {c[len("in_"):]: c for c in df.columns if c.startswith("in_")}
+
+    consumed = mc.OPENROCKET_PARAMETERS if engine == "openrocket" else set(ins)
+    ignored = sorted(p for p in ins if p not in consumed)
+
+    # A frozen parameter is pinned to one value, so it has no distribution to
+    # draw.  Constant-but-not-frozen cannot happen: every sampler draws floats.
+    dispersed = [p for p, col in ins.items()
+                 if p in consumed and ok[col].nunique() > 1]
+    held = [p for p in ins if p in consumed and p not in dispersed]
+    if not dispersed:
+        raise ValueError("no dispersed inputs to plot; every parameter is nominal")
+
+    known = {p for _, params in INPUT_GROUPS for p in params}
+    groups = [(g, [p for p in params if p in dispersed]) for g, params in INPUT_GROUPS]
+    groups.append(("Other", [p for p in dispersed if p not in known]))
+
+    # Wrap a group wider than MAXCOLS onto continuation rows, so one six-panel
+    # group cannot set the width of a figure meant for a portrait report page.
+    # A subset run with few parameters narrows instead: ncols is the widest row
+    # actually drawn, not the cap, so two panels do not sit in a 4-wide grid.
+    MAXCOLS = 4
+    rows: list[tuple[str, list[str]]] = []
+    for group, params in groups:
+        for i in range(0, len(params), MAXCOLS):
+            rows.append((group if i == 0 else "", params[i:i + MAXCOLS]))
+    ncols = max(len(params) for _, params in rows)
+
+    fig, axes = plt.subplots(len(rows), ncols, squeeze=False,
+                             figsize=(2.6 * ncols, 2.5 * len(rows)))
+    for r, (group, params) in enumerate(rows):
+        for c in range(ncols):
+            ax = axes[r][c]
+            if c >= len(params):
+                ax.axis("off")
+                continue
+
+            param = params[c]
+            v = ok[ins[param]].astype(float)
+            spec = (uncertainty or {}).get(param)
+            # Sturges-ish, floored so a 50-case pilot run still shows a shape.
+            ax.hist(v, bins=min(30, max(8, int(np.sqrt(len(v))))),
+                    color=ACCENT, alpha=0.75, edgecolor="white", linewidth=0.5)
+            ax.axvline(v.mean(), color=FAIL_C, lw=1.3)
+
+            sigma = f"sd {v.std():.3g}"
+            requested = None if spec is None else spec.get("sigma")
+            if requested:                      # None, null, or 0.0 -> nothing to compare
+                sigma += f" (req {float(requested):.3g})"
+            _style(ax, f"{param.replace('_', ' ')}\n{sigma}",
+                   _input_unit(param, spec), "")
+            # Wide absolute ranges (pressure in Pa) otherwise overprint.
+            ax.ticklabel_format(axis="x", style="sci", scilimits=(-3, 4),
+                                useOffset=False)
+            ax.xaxis.get_offset_text().set_fontsize(7)
+            ax.xaxis.set_major_locator(plt.MaxNLocator(nbins=5))
+            ax.set_title(ax.get_title(), fontsize=8.5, fontweight="bold")
+            ax.tick_params(labelsize=7)
+            # Group name rides the leftmost y-label, so the row is labeled once.
+            ax.set_ylabel(f"{group}\nCases" if c == 0 else "", fontsize=8.5)
+
+    # Each line wrapped on its own, so the wrapper never breaks a line directly
+    # after the "held nominal:" lead-in and leave it dangling.  Width tracks the
+    # grid because _save crops with bbox_inches="tight": a caption wider than the
+    # panels would widen the entire figure.
+    width = max(46, 34 * ncols)
+    head = f"Sampled inputs, N={len(ok)} successful cases"
+    if engine == "openrocket":
+        head += " -- OpenRocket, launch conditions only"
+    lines = textwrap.wrap(head, width)
+    if ignored:
+        lines += textwrap.wrap(f"drawn but not used by this engine: "
+                               f"{len(ignored)} vehicle/motor/recovery parameters", width)
+    if held:
+        # Name a few, then count the rest.  A --only run can hold fourteen
+        # parameters nominal, and the full list belongs in the report text
+        # rather than in a caption that would crowd out the histograms.
+        shown = sorted(held)[:3]
+        rest = f" +{len(held) - len(shown)} more" if len(held) > len(shown) else ""
+        lines += textwrap.wrap("held nominal: " + ", ".join(shown) + rest, width)
+
+    fig.suptitle("\n".join(lines), fontsize=9.5, fontweight="bold")
+    fig.tight_layout(rect=(0, 0, 1, 1 - 0.03 * len(lines)))
     return _save(fig, out_dir, name)
 
 

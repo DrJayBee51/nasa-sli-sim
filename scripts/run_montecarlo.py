@@ -195,6 +195,7 @@ def main() -> int:
     report.plot_apogee_distribution(df, out_dir, target_ft, f"apogee_dist_{tag}.png")
     report.plot_landing_scatter(df, out_dir, ell, f"landing_{tag}.png")
     report.plot_sensitivity(sens.head(12), out_dir, "apogee", f"sensitivity_{tag}.png")
+    report.plot_input_distributions(df, out_dir, unc, args.engine, f"inputs_{tag}.png")
 
     report.write_markdown(
         out_dir / f"montecarlo_{tag}.md",
@@ -221,7 +222,8 @@ def main() -> int:
             ("Figures",
              f"![apogee](apogee_dist_{tag}.png)\n\n"
              f"![landing](landing_{tag}.png)\n\n"
-             f"![sensitivity](sensitivity_{tag}.png)"),
+             f"![sensitivity](sensitivity_{tag}.png)\n\n"
+             f"![sampled inputs](inputs_{tag}.png)"),
         ],
     )
     print(f"  Wrote {csv}")

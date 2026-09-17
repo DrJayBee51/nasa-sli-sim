@@ -750,6 +750,7 @@ Everything lands in `output/`.
 | `apogee_dist_*.png` | Apogee histogram with the requirement window |
 | `landing_*.png` | Landing scatter against the 2,500 ft radius |
 | `sensitivity_*.png` | What drives apogee |
+| `inputs_*.png` | Histogram per dispersed input, observed sd vs the requested sigma |
 | `crossvalidation.md` | Report-ready engine comparison |
 | `montecarlo_*.csv` | Every case, every input and output — for your own analysis (the Rainbow CSV extension makes these readable in VS Code) |
 | `montecarlo_*.md` | Report-ready dispersion summary |
@@ -830,10 +831,21 @@ the engine bridges — so that is the only file you need to open.
 | `plot_apogee_distribution` | `apogee_dist_*.png` | `run_montecarlo.py` |
 | `plot_landing_scatter` | `landing_*.png` | `run_montecarlo.py` |
 | `plot_sensitivity` | `sensitivity_*.png` | `run_montecarlo.py` |
+| `plot_input_distributions` | `inputs_*.png` | `run_montecarlo.py` |
 | `plot_comparison` | `engine_comparison*.png`, `crossvalidation.png` | `run_nominal.py`, `run_crossvalidate.py` |
 
+`inputs_*.png` is the one figure about the *inputs* rather than the results: a
+histogram per dispersed parameter, grouped as in `config/uncertainty.yaml`, with
+the observed standard deviation printed against the sigma the file requested.
+Use it to show a reviewer that the campaign sampled what you said it did — if an
+observed sd disagrees with its requested one by more than sampling noise, the
+run did not do what the YAML asked. Parameters held nominal are left out, and
+under `--engine openrocket` only the six launch conditions appear, because those
+are the only ones that engine consumes
+([§4.4](#44-dispersing-one-parameter-at-a-time)).
+
 **They all have the same four-step shape.** `plot_sensitivity` is the shortest,
-so read that one first — the other five differ only in how much drawing happens
+so read that one first — the others differ only in how much drawing happens
 in step 2:
 
 ```python
@@ -1191,6 +1203,14 @@ Exit code 0 if no requirement FAILs, 1 otherwise — usable in CI.
 | `--noise-ft X` | 6.0 | Barometric noise, 1σ |
 | `--rate-hz X` | 20.0 | Sample rate |
 | `--wind-mph`, `--temp-f` | | Conditions to simulate |
+
+### `check_input_plots.py`
+
+No flags. Renders `inputs_*.png` against a synthetic campaign and checks the
+parts that are logic rather than drawing — the per-engine filter, frozen-parameter
+exclusion, the `sigma: null` annotation. Prints one line per check and exits
+non-zero on the first failure. Run it after editing
+`plot_input_distributions`; nothing is written to `output/`.
 
 ---
 
