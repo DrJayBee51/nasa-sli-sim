@@ -683,6 +683,59 @@ because perturbing mass and drag would mean rebuilding the component tree for
 every sample. Use RocketPy for dispersion; use OpenRocket as the independent
 check on the trajectory.
 
+## 4.4 Dispersing one parameter at a time
+
+A full campaign answers "how much might we miss by?". It does not answer "how
+much of that is the drag we do not know?" — every input moves at once, so no
+single histogram belongs to any one of them. `--only` and `--freeze` narrow the
+set; everything not selected is held at its nominal value.
+
+```bash
+python scripts/run_montecarlo.py --list-parameters             # the names
+python scripts/run_montecarlo.py -n 1000 --only drag_coefficient
+python scripts/run_montecarlo.py -n 1000 --only wind_speed_mps,wind_direction_deg
+python scripts/run_montecarlo.py -n 1000 --freeze drag_coefficient
+```
+
+| Flag | Meaning |
+|---|---|
+| `--only P1,P2` | Disperse exactly these; hold every other parameter nominal |
+| `--freeze P1,P2` | Hold these nominal; disperse everything else |
+| `--list-parameters` | Print the names, their distributions, and which engine uses them |
+
+**What this is good for.**
+
+- *Showing a single effect.* `--only drag_coefficient` makes the apogee
+  histogram a picture of drag uncertainty and nothing else. The Spearman
+  correlation comes back at exactly ±1.00, which is a useful sanity check that
+  the parameter is wired through the model at all.
+- *Budgeting the error.* Run `--only` once per parameter at a fixed seed and
+  collect the apogee standard deviations. They add roughly in quadrature to the
+  full-campaign sigma, which turns the sensitivity bar chart into a variance
+  budget in feet — a far easier thing to defend at CDR than a rank correlation.
+- *Answering "what if we measured this better?"* `--freeze drag_coefficient` is
+  the campaign you would have if drag were known perfectly. The difference
+  between that spread and the full one is the value of doing the Cd fit in
+  Part 6, in feet of apogee.
+
+**Held nominal means nominal, not absent.** A frozen parameter is still drawn,
+pinned to its nominal value: relative multipliers to 1.0, shifts to 0.0, and
+wind, temperature and pressure to the *site's* nominal conditions from
+`sites.yaml`. Freezing the wind flies the site's mean wind, not a dead calm.
+The one arbitrary case is `rail_direction_deg`, which is uniform over the full
+circle and has no mean; frozen, it takes the midpoint (180°).
+
+**Every output says what was dispersed.** The filenames carry an `_only-...` or
+`_except-...` tag and the markdown report lists both sets, so a subset run
+cannot be mistaken later for a full campaign. Only a full campaign supports a
+compliance probability — P(pass) from a run with one input dispersed is the
+probability given that nothing else is uncertain, which is not a claim any
+review will accept.
+
+**OpenRocket.** It only sees the six launch-condition parameters, so
+`--only drag_coefficient --engine openrocket` would run N identical flights.
+The script refuses that rather than printing a distribution with no width.
+
 ---
 
 # Part 5 — Reading the output
@@ -911,6 +964,9 @@ Exit code 0 if no requirement FAILs, 1 otherwise — usable in CI.
 | `--ballast {min,max}` | `min` | Ballast configuration |
 | `--seed N` | 12345 | Random seed — record this |
 | `--workers N` | CPU count (max 8) | Parallel processes |
+| `--only P1,P2` | all | Disperse only these parameters (§4.4) |
+| `--freeze P1,P2` | none | Hold these parameters nominal (§4.4) |
+| `--list-parameters` | off | Print the dispersible parameter names and exit |
 | `--site KEY`, `--vehicle PATH`, `--out DIR` | | As above |
 
 ### `run_crossvalidate.py`

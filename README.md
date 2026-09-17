@@ -179,6 +179,8 @@ python scripts/run_nominal.py --ballast both      # req 2.20.7.4 wants both extr
 # Monte Carlo dispersion
 python scripts/run_montecarlo.py -n 1000
 python scripts/run_montecarlo.py -n 500 --engine openrocket
+python scripts/run_montecarlo.py --list-parameters          # what you can disperse
+python scripts/run_montecarlo.py -n 1000 --only drag_coefficient   # one variable at a time
 
 # Cross-validation report (PDR/CDR/FRR "different calculation method" bullet)
 python scripts/run_crossvalidate.py

@@ -120,6 +120,9 @@ def landing_ellipse(df: pd.DataFrame, n_sigma: float = 3.0) -> dict[str, float]:
     vals, vecs = np.linalg.eigh(cov)
     order = np.argsort(vals)[::-1]
     vals, vecs = vals[order], vecs[:, order]
+    # A campaign that disperses only one input can be degenerate along one axis,
+    # where eigh returns a tiny negative eigenvalue and the semi-axis becomes NaN.
+    vals = np.clip(vals, 0.0, None)
     return {
         "mean_x_ft": float(x.mean()),
         "mean_y_ft": float(y.mean()),

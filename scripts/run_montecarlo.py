@@ -3,6 +3,14 @@
     python scripts/run_montecarlo.py -n 1000
     python scripts/run_montecarlo.py -n 500 --engine openrocket
     python scripts/run_montecarlo.py -n 2000 --ballast max --site home_field
+
+Disperse a subset of the inputs to isolate what one variable does to the
+flight -- everything not selected is held at its nominal value:
+
+    python scripts/run_montecarlo.py --list-parameters
+    python scripts/run_montecarlo.py -n 1000 --only drag_coefficient
+    python scripts/run_montecarlo.py -n 1000 --only wind_speed_mps,wind_direction_deg
+    python scripts/run_montecarlo.py -n 1000 --freeze drag_coefficient
 """
 
 from __future__ import annotations
@@ -14,9 +22,49 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from slisim import analysis, montecarlo, or_bridge as orb, report, units as U  # noqa: E402
-from slisim.config import Site, Vehicle  # noqa: E402
+from slisim.config import Site, Vehicle, load_uncertainty  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "output"
+
+
+def _names(arg: str | None) -> list[str] | None:
+    """Parse a comma- and/or space-separated parameter list."""
+    if not arg:
+        return None
+    return [n for n in arg.replace(",", " ").split() if n]
+
+
+def _subset_tag(only: list[str] | None, freeze: list[str] | None) -> str:
+    """Filename suffix so a subset run never overwrites the full campaign."""
+    if only:
+        kind, names = "only", only
+    elif freeze:
+        kind, names = "except", freeze
+    else:
+        return ""
+    if len(names) > 3:
+        return f"_{kind}{len(names)}"
+    return "_" + kind + "-" + "+".join(sorted(names))
+
+
+def _list_parameters(unc: dict) -> int:
+    print("Parameters available to --only / --freeze (config/uncertainty.yaml):")
+    print()
+    for name, spec in unc.items():
+        dist = spec.get("distribution", "normal")
+        if dist == "uniform":
+            spread = f"uniform[{spec['low']:g}, {spec['high']:g}]"
+        else:
+            sig = spec.get("sigma")
+            sig = "site" if sig is None else f"{sig:g}"
+            spread = f"{dist}, sigma={sig}"
+            if spec.get("relative"):
+                spread += " (relative)"
+        mark = "  " if name in montecarlo.OPENROCKET_PARAMETERS else " *"
+        print(f" {mark} {name:<26} {spread}")
+    print()
+    print(" * RocketPy only -- OpenRocket disperses launch conditions only.")
+    return 0
 
 
 def main() -> int:
@@ -30,7 +78,36 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=12345)
     ap.add_argument("--workers", type=int, default=None)
     ap.add_argument("--out", default=str(OUT))
+    sel = ap.add_mutually_exclusive_group()
+    sel.add_argument("--only", default=None, metavar="P1,P2",
+                     help="disperse ONLY these parameters; hold the rest nominal")
+    sel.add_argument("--freeze", default=None, metavar="P1,P2",
+                     help="hold these parameters nominal; disperse the rest")
+    ap.add_argument("--list-parameters", action="store_true",
+                    help="print the dispersible parameter names and exit")
     args = ap.parse_args()
+
+    if args.list_parameters:
+        return _list_parameters(load_uncertainty())
+
+    only, freeze = _names(args.only), _names(args.freeze)
+    try:
+        unc = montecarlo.select_parameters(load_uncertainty(), only, freeze)
+    except KeyError as exc:
+        print(f"error: {exc.args[0]}")
+        return 2
+    dispersed = montecarlo.dispersed_parameters(unc)
+    held = [k for k in unc if k not in dispersed]
+    if not dispersed:
+        print("error: every parameter is held nominal; nothing to disperse")
+        return 2
+    if args.engine == "openrocket" and not (
+            set(dispersed) & montecarlo.OPENROCKET_PARAMETERS):
+        print("error: OpenRocket disperses launch conditions only, and none of "
+              f"{', '.join(dispersed)} is one.")
+        print("       Every case would be identical. Use --engine rocketpy, "
+              "or see --list-parameters.")
+        return 2
 
     vehicle = Vehicle.from_yaml(args.vehicle)
     site = Site.from_yaml(args.site)
@@ -42,11 +119,15 @@ def main() -> int:
     print(f"Site    : {site.name}")
     print(f"Engine  : {args.engine}   N={args.samples}   seed={args.seed}"
           f"   ballast={U.kg_to_lb(ballast):.2f} lb")
+    if only or freeze:
+        print(f"Varying : {', '.join(dispersed)}")
+        print(f"Nominal : {', '.join(held)}")
     print()
 
     df = montecarlo.run_montecarlo(
         vehicle, site, n=args.samples, engine=args.engine,
         ballast_kg=ballast, seed=args.seed, workers=args.workers,
+        uncertainty=unc,
     )
 
     failed = int((~df["ok"].astype(bool)).sum())
@@ -100,7 +181,8 @@ def main() -> int:
 
     # --- artifacts
     out_dir.mkdir(parents=True, exist_ok=True)
-    tag = f"{args.engine}_n{args.samples}_{args.ballast}"
+    tag = (f"{args.engine}_n{args.samples}_{args.ballast}"
+           f"{_subset_tag(only, freeze)}")
     csv = out_dir / f"montecarlo_{tag}.csv"
     df.to_csv(csv, index=False)
 
@@ -119,6 +201,8 @@ def main() -> int:
              f"- Ballast: {U.kg_to_lb(ballast):.2f} lb\n"
              f"- Motor: {motor_info['designation']} "
              f"({motor_info['total_impulse_ns']:.0f} N-s)\n"
+             f"- Dispersed: {', '.join(dispersed)}\n"
+             f"- Held nominal: {', '.join(held) or 'none'}\n"
              f"- Failed cases: {failed}"),
             ("Dispersion summary",
              report.table(stats.reset_index().rename(columns={"index": "quantity"}), "{:.2f}")),

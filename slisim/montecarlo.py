@@ -65,6 +65,86 @@ def _draw_one(spec: dict, rng: np.random.Generator,
     raise ValueError(f"unknown distribution {dist!r}")
 
 
+# ---------------------------------------------------------------------------
+#  Parameter selection
+# ---------------------------------------------------------------------------
+#  Which of the launch-condition keys each engine actually consumes.  Only
+#  these six reach OpenRocket (see run_openrocket_case), so dispersing, say,
+#  drag_coefficient alone under --engine openrocket would produce a campaign
+#  with no scatter at all.  Naming them here lets the caller warn instead.
+OPENROCKET_PARAMETERS = frozenset({
+    "wind_speed_mps", "wind_direction_deg", "temperature_k", "pressure_pa",
+    "rail_angle_deg", "rail_direction_deg",
+})
+
+
+def _freeze_spec(spec: dict) -> dict:
+    """Collapse one uncertainty entry onto its nominal value.
+
+    A frozen parameter is pinned, not deleted.  Deleting the key would make
+    `_overrides_from` fall back to its own hard-coded defaults -- 0 m/s wind,
+    288.15 K, 101325 Pa -- instead of the launch site's nominal conditions, so
+    "freeze the wind" would quietly become "fly in a vacuum-flask atmosphere".
+    Collapsing the distribution instead keeps `mean: null` inheritance intact.
+
+    The draw is kept, not skipped, so the sampler consumes the same number of
+    values per case as a full run and the parameters that are still dispersed
+    stay comparable between an all-parameters run and a subset run at the same
+    seed.
+    """
+    out = dict(spec)
+    if out.get("distribution", "normal") == "uniform":
+        # No mean to fall back on: the midpoint is the only neutral choice.
+        out["low"] = out["high"] = 0.5 * (float(out["low"]) + float(out["high"]))
+    else:
+        out["sigma"] = 0.0
+    return out
+
+
+def select_parameters(unc: dict, only: list[str] | None = None,
+                      freeze: list[str] | None = None) -> dict:
+    """Return a copy of `unc` with the unselected parameters held at nominal.
+
+    `only` disperses exactly the parameters named and pins everything else;
+    `freeze` pins the parameters named and disperses everything else.  This is
+    how you show what a single variable does to the flight: dispersing drag
+    alone and nothing else makes the apogee histogram a picture of drag
+    uncertainty, rather than of all fourteen inputs at once.
+    """
+    if only and freeze:
+        raise ValueError("pass only= or freeze=, not both")
+
+    known = set(unc)
+    for name in list(only or []) + list(freeze or []):
+        if name not in known:
+            raise KeyError(
+                f"unknown uncertainty parameter {name!r}; "
+                f"config/uncertainty.yaml defines: {', '.join(sorted(known))}"
+            )
+
+    if only:
+        frozen = known - set(only)
+    elif freeze:
+        frozen = set(freeze)
+    else:
+        return dict(unc)
+
+    return {k: (_freeze_spec(v) if k in frozen else v) for k, v in unc.items()}
+
+
+def dispersed_parameters(unc: dict) -> list[str]:
+    """Names still carrying spread, in file order."""
+    out = []
+    for key, spec in unc.items():
+        if spec.get("distribution", "normal") == "uniform":
+            if float(spec["low"]) != float(spec["high"]):
+                out.append(key)
+        elif spec.get("sigma", 0.0) != 0.0:
+            # `sigma: null` means "inherit from the site", which is a real spread.
+            out.append(key)
+    return out
+
+
 def draw_sample(unc: dict, site: Site, rng: np.random.Generator) -> dict[str, float]:
     """One full set of perturbations."""
     site_means = {
@@ -204,14 +284,21 @@ def run_montecarlo(vehicle: Vehicle, site: Site, n: int = 500,
                    engine: str = "rocketpy", ballast_kg: float = 0.0,
                    seed: int = 12345, workers: int | None = None,
                    uncertainty: dict | None = None,
+                   only: list[str] | None = None,
+                   freeze: list[str] | None = None,
                    progress: bool = True) -> pd.DataFrame:
     """Run `n` dispersed flights and return one row per case.
 
     A fixed `seed` makes the whole campaign reproducible, which matters: a
     reviewer asking "where did 4,712 ft come from" should be able to get the
     identical number back months later.
+
+    `only` / `freeze` narrow which parameters are dispersed; everything else is
+    held at its nominal value.  The set that was actually dispersed is recorded
+    in `df.attrs["dispersed"]`, so a subset run is never mistaken for a full one.
     """
     unc = uncertainty if uncertainty is not None else load_uncertainty()
+    unc = select_parameters(unc, only, freeze)
     rng = np.random.default_rng(seed)
 
     samples = []
@@ -239,6 +326,7 @@ def run_montecarlo(vehicle: Vehicle, site: Site, n: int = 500,
 
     df = pd.DataFrame(rows).sort_values("index").reset_index(drop=True)
     df.attrs["engine"] = engine
+    df.attrs["dispersed"] = dispersed_parameters(unc)
     df.attrs["seed"] = seed
     df.attrs["n"] = n
     df.attrs["ballast_kg"] = ballast_kg
