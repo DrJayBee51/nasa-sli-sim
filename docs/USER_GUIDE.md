@@ -1204,14 +1204,6 @@ Exit code 0 if no requirement FAILs, 1 otherwise — usable in CI.
 | `--rate-hz X` | 20.0 | Sample rate |
 | `--wind-mph`, `--temp-f` | | Conditions to simulate |
 
-### `check_input_plots.py`
-
-No flags. Renders `inputs_*.png` against a synthetic campaign and checks the
-parts that are logic rather than drawing — the per-engine filter, frozen-parameter
-exclusion, the `sigma: null` annotation. Prints one line per check and exits
-non-zero on the first failure. Run it after editing
-`plot_input_distributions`; nothing is written to `output/`.
-
 ---
 
 # Appendix A — Cheat sheet
