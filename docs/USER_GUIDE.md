@@ -754,6 +754,9 @@ Everything lands in `output/`.
 | `montecarlo_*.csv` | Every case, every input and output — for your own analysis (the Rainbow CSV extension makes these readable in VS Code) |
 | `montecarlo_*.md` | Report-ready dispersion summary |
 
+Every one of those PNGs is drawn by a function in `slisim/report.py`. Section
+5.5 explains how they are put together and 5.6 how to change them.
+
 ## 5.1 The apogee distribution
 
 Read three things: where the **median** sits relative to your declared target;
@@ -813,6 +816,188 @@ yourselves in a review before a panelist raises it for you.
 | "Discuss any differences" | `crossvalidation.md` discussion section |
 | "Multiple simulations to verify results are precise" | `montecarlo_*.md` |
 | "Estimate Cd utilizing launch data" (FRR) | `postflight_cd_fit.md` |
+
+## 5.5 How the figures are defined
+
+Every figure in `output/` is produced by one function in **`slisim/report.py`**.
+There is no plotting anywhere else in the framework — not in the scripts, not in
+the engine bridges — so that is the only file you need to open.
+
+| Function | Produces | Called by |
+|---|---|---|
+| `plot_flight_profile` | `flight_profile_*.png` | `run_nominal.py`, `run_crossvalidate.py` |
+| `plot_stability` | `stability_*.png` | `run_nominal.py` |
+| `plot_apogee_distribution` | `apogee_dist_*.png` | `run_montecarlo.py` |
+| `plot_landing_scatter` | `landing_*.png` | `run_montecarlo.py` |
+| `plot_sensitivity` | `sensitivity_*.png` | `run_montecarlo.py` |
+| `plot_comparison` | `engine_comparison*.png`, `crossvalidation.png` | `run_nominal.py`, `run_crossvalidate.py` |
+
+**They all have the same four-step shape.** `plot_sensitivity` is the shortest,
+so read that one first — the other five differ only in how much drawing happens
+in step 2:
+
+```python
+def plot_sensitivity(sens: pd.DataFrame, out_dir: Path, output_label: str,
+                     name: str = "sensitivity.png") -> Path:
+    fig, ax = plt.subplots(figsize=(8, max(3.0, 0.42 * len(sens))))   # 1. make it
+    colors = [FAIL_C if v < 0 else ACCENT for v in sens["spearman_rho"]]
+    ax.barh(sens["input"], sens["spearman_rho"], color=colors, alpha=0.85)
+    ax.axvline(0, color="black", lw=0.9)                              # 2. draw it
+    ax.invert_yaxis()
+    _style(ax, f"What drives {output_label}", "Spearman rank correlation", "")
+    ax.set_xlim(-1, 1)                                                # 3. style it
+    return _save(fig, out_dir, name)                                  # 4. save it
+```
+
+Steps 1, 3 and 4 are nearly identical everywhere. Step 2 is the only part that
+knows anything about rockets.
+
+**Two shared helpers do the work of steps 3 and 4.** Both sit at the top of
+`report.py`, and changing either one restyles *every* figure at once — which is
+usually what you want, and is much safer than editing six functions by hand.
+
+- `_style(ax, title, xlabel, ylabel)` sets the title weight and font sizes, the
+  axis labels, the grid, the tick size, and hides the top and right spines.
+- `_save(fig, out_dir, name)` creates the directory, writes the PNG at 160 dpi
+  with a tight bounding box, closes the figure, and returns the path. Closing
+  matters: a script that makes a dozen figures without closing them will warn
+  about too many open figures and hold onto the memory.
+
+**Four colors, named once.** The module defines
+
+```python
+PASS_C, FAIL_C, NEUTRAL, ACCENT = "#2E7D32", "#C62828", "#37474F", "#1565C0"
+```
+
+and every function uses those names rather than literal hex strings. Green means
+"meets the requirement", red means "violates it, or is the comparison series",
+blue is the data itself, grey is a reference line. Keeping those meanings
+consistent is the reason a reviewer can read your second figure without
+re-reading the legend.
+
+**Requirement lines are imported, never typed in.** The 2,500 ft circle, the
+4,000–6,000 ft band and the 2.0 caliber line come from `slisim/requirements.py`
+as `rq.MAX_DRIFT_FT`, `rq.APOGEE_MIN_FT` / `rq.APOGEE_MAX_FT` and
+`rq.MIN_STABILITY_CAL`. If the handbook changes a limit, you edit one constant
+and every figure, table and pass/fail check moves together. Do not paste the
+number into a plot.
+
+**Units convert at the plot boundary — and the two data sources differ.** This
+is the most common mistake when editing these functions:
+
+| Source | Units | What the plot must do |
+|---|---|---|
+| `res.series[...]`, the time histories from a nominal run | **SI** (`altitude_m`, `velocity_total_mps`) | Convert: `U.m_to_ft(s["altitude_m"])` |
+| The Monte Carlo `DataFrame` | **already imperial** (`apogee_ft`, `drift_ft`, `landing_x_ft`) | Plot as-is |
+
+That is why `plot_flight_profile` is full of `U.` calls and
+`plot_apogee_distribution` has none. If a new figure comes out about 3.3 times
+too large, you converted something that was already in feet.
+
+**The `ok` mask.** Every Monte Carlo figure starts with
+
+```python
+ok = df[df.get("ok", True) == True]  # noqa: E712
+```
+
+A case that failed to simulate still gets a row, with `ok = False` and no
+outputs, so that a crash in case 273 does not throw away the other 999. Plot
+without the mask and those rows quietly distort the histogram. The `== True` is
+deliberate — `is True` does not vectorize over a pandas Series — and the `noqa`
+comment stops the linter objecting to it.
+
+**Leave `matplotlib.use("Agg")` alone.** Near the top of `report.py` it selects
+a non-interactive backend *before* `pyplot` is imported, which is the only order
+that works. It is what lets the framework draw figures with no display attached:
+over SSH, in CI, and inside the Monte Carlo worker processes. Remove it and the
+scripts start trying to open windows. If you want to poke at a figure
+interactively, do it in a separate session — see below — not by editing that
+line.
+
+## 5.6 Changing a figure
+
+| What you want | What to edit |
+|---|---|
+| Fonts, grid, spines, tick sizes — everywhere | `_style()` |
+| Resolution or file format — everywhere | `_save()` (`dpi=160`, and the extension in the `name` the script passes) |
+| The color scheme — everywhere | The `PASS_C, FAIL_C, NEUTRAL, ACCENT` line |
+| One figure's size, bins, limits, legend | That figure's own function |
+| Which figures a run produces | The `report.plot_*` calls near the bottom of the script, plus the `Figures` section of its `write_markdown` call |
+
+**Iterate on the CSV, not on the simulation.** Re-running 1,000 cases to find
+out whether you like a bin count is a waste of an afternoon. Every Monte Carlo
+run already wrote `montecarlo_*.csv` with every input and output in it, so
+reload that and call the plotting functions directly:
+
+```python
+# scratch.py, run from the sim/ directory
+from pathlib import Path
+import pandas as pd
+from slisim import analysis, report
+
+out = Path("output")
+df = pd.read_csv(out / "montecarlo_rocketpy_n1000_min.csv")
+
+report.plot_apogee_distribution(df, out, 4500.0, "apogee_test.png")
+report.plot_landing_scatter(df, out, analysis.landing_ellipse(df), "landing_test.png")
+report.plot_sensitivity(analysis.sensitivity(df, "apogee_ft").head(12),
+                        out, "apogee", "sensitivity_test.png")
+```
+
+That turns a two-minute edit-run-look cycle into a two-second one. Give the test
+figures their own names so you do not overwrite the ones a real run produced.
+
+**Adding a figure takes three steps.** Say you want max Mach dispersion against
+the requirement 2.20.6 limit. First, write the function in `report.py` — copy
+the nearest existing one and change step 2:
+
+```python
+def plot_mach_distribution(df: pd.DataFrame, out_dir: Path,
+                           name: str = "mach_distribution.png") -> Path:
+    """Max Mach against the req 2.20.6 limit."""
+    ok = df[df.get("ok", True) == True]  # noqa: E712
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.hist(ok["max_mach"], bins=30, color=ACCENT, alpha=0.75,
+            edgecolor="white", linewidth=0.5)
+    ax.axvline(rq.MAX_MACH, color=FAIL_C, lw=1.6, ls="--",
+               label=f"req 2.20.6 limit (Mach {rq.MAX_MACH:g})")
+
+    _style(ax, f"Max Mach dispersion, N={len(ok)}", "Mach number (-)", "Cases")
+    ax.legend(fontsize=8, frameon=False)
+    return _save(fig, out_dir, name)
+```
+
+Second, call it from `scripts/run_montecarlo.py` alongside the other three:
+
+```python
+report.plot_mach_distribution(df, out_dir, f"mach_{tag}.png")
+```
+
+Third — the step people forget — add it to the `Figures` section of the
+`write_markdown` call in the same script, or it will exist on disk and appear in
+no report:
+
+```python
+f"![mach](mach_{tag}.png)"
+```
+
+**What to preserve when you change things.** These figures go in front of a
+review panel, so some of the existing choices are not decoration:
+
+- **Label the axes, with units.** "Apogee (ft AGL)", not "apogee". AGL versus
+  MSL has cost teams real points.
+- **Do not let color carry meaning on its own.** Reviewers print in greyscale,
+  and some are colorblind. The existing figures always pair color with a line
+  style, a marker, or a legend entry. Keep that.
+- **Keep the requirement line on the plot.** A histogram of apogee without the
+  4,000–6,000 ft band is a picture. With the band, it is evidence.
+- **Say what N is.** The Monte Carlo titles carry `N=` and the pass fraction for
+  a reason: a beautiful distribution built from 25 cases is not a result.
+- **Commit the code, not the PNG.** `output/` is in `.gitignore` (Part 0) by
+  design — figures are regenerable, and binary diffs tell a reviewer nothing.
+  What belongs in git is the `report.py` change that makes the figure, so anyone
+  on the team can reproduce it from the same seed months later.
 
 ---
 

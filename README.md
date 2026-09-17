@@ -158,7 +158,7 @@ sim/
 │   ├── montecarlo.py      sampling + parallel driver
 │   ├── analysis.py        dispersion stats, compliance rates, sensitivity
 │   ├── postflight.py      Cd fit from altimeter data
-│   └── report.py          report-ready plots and tables
+│   └── report.py          every plot in the framework, and the markdown assembly
 ├── scripts/               ← run these
 └── output/                figures, CSVs, markdown reports
 ```
