@@ -19,6 +19,9 @@ import argparse
 import sys
 from pathlib import Path
 
+# Puts the project root on the import path so `python scripts/run_crossvalidate.py`
+# works without installing the package first.  It has to run before the imports
+# below, which is what the `noqa: E402` markers acknowledge.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd  # noqa: E402
@@ -75,10 +78,10 @@ def main() -> int:
     args = ap.parse_args()
 
     vehicle = Vehicle.from_yaml(args.vehicle)
-    site = Site.from_yaml(args.site)
+    site    = Site.from_yaml(args.site)
     out_dir = Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)   # gitignored; absent in a fresh clone
     ballast = vehicle.ballast_min_kg if args.ballast == "min" else vehicle.ballast_max_kg
+    out_dir.mkdir(parents=True, exist_ok=True)   # gitignored; absent in a fresh clone
 
     print(f"Vehicle : {vehicle.name}")
     print(f"Site    : {site.name}")
@@ -86,12 +89,14 @@ def main() -> int:
 
     # --- nominal, both engines
     doc, rocket, _mount, motor = orb.build_document(vehicle, ballast)
-    or_res = orb.run_simulation(orb.make_simulation(doc, rocket, site),
-                                rocket, keep_series=True)
+    sim = orb.make_simulation(doc, rocket, site)
+    or_res = orb.run_simulation(sim, rocket, keep_series=True)
+
     power_on, power_off = rpm.export_drag_curves(or_res)
     mass_props = rpm.export_mass_properties(rocket, orb.ensure_jvm())
     rk = rpm.build_rocket(vehicle, motor, mass_props, power_on, power_off)
-    rp_res = rpm.extract(rpm.build_flight(rk, rpm.build_environment(site), site), rk, motor)
+    flight = rpm.build_flight(rk, rpm.build_environment(site), site)
+    rp_res = rpm.extract(flight, rk, motor)
 
     cmp_df = analysis.compare(or_res.to_row(), rp_res.to_row())
     print("  NOMINAL COMPARISON")

@@ -19,6 +19,9 @@ import argparse
 import sys
 from pathlib import Path
 
+# Puts the project root on the import path so `python scripts/run_montecarlo.py`
+# works without installing the package first.  It has to run before the slisim
+# imports below, which is what the `noqa: E402` markers acknowledge.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from slisim import analysis, montecarlo, or_bridge as orb, report, units as U  # noqa: E402
@@ -90,6 +93,9 @@ def main() -> int:
     if args.list_parameters:
         return _list_parameters(load_uncertainty())
 
+    # Narrow the uncertainty set to what --only / --freeze asked for, then reject
+    # the two combinations that would run but tell you nothing.  Exit 2 (not 1)
+    # keeps "you asked for something impossible" distinct from a requirement FAIL.
     only, freeze = _names(args.only), _names(args.freeze)
     try:
         unc = montecarlo.select_parameters(load_uncertainty(), only, freeze)
@@ -109,10 +115,10 @@ def main() -> int:
               "or see --list-parameters.")
         return 2
 
-    vehicle = Vehicle.from_yaml(args.vehicle)
-    site = Site.from_yaml(args.site)
-    out_dir = Path(args.out)
-    ballast = vehicle.ballast_min_kg if args.ballast == "min" else vehicle.ballast_max_kg
+    vehicle   = Vehicle.from_yaml(args.vehicle)
+    site      = Site.from_yaml(args.site)
+    out_dir   = Path(args.out)
+    ballast   = vehicle.ballast_min_kg if args.ballast == "min" else vehicle.ballast_max_kg
     target_ft = U.m_to_ft(vehicle.target_apogee_m)
 
     print(f"Vehicle : {vehicle.name}  [{vehicle.status}]")

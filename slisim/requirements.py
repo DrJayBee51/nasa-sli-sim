@@ -19,6 +19,10 @@ from typing import Any, Callable
 from . import units as U
 from .config import Vehicle
 
+# Width of every horizontal rule the scripts print, so the requirement table
+# and the banners around it line up.  Import this rather than repeating it.
+TABLE_WIDTH = 104
+
 
 class Status(str, Enum):
     PASS = "PASS"
@@ -290,7 +294,7 @@ def summarize(checks: list[Check]) -> dict[str, int]:
 def format_table(checks: list[Check]) -> str:
     lines = [
         "  STATUS  REQ      REQUIREMENT                                 VALUE UNITS    LIMIT",
-        "  " + "-" * 100,
+        "-" * TABLE_WIDTH,
     ]
     for c in checks:
         val = "-" if c.value is None else f"{c.value:10.2f}"
@@ -298,6 +302,6 @@ def format_table(checks: list[Check]) -> str:
         if c.note:
             lines.append(f"          {'':8s} `-- {c.note}")
     s = summarize(checks)
-    lines.append("  " + "-" * 100)
+    lines.append("-" * TABLE_WIDTH)
     lines.append(f"  {s['PASS']} pass, {s['WARN']} warn, {s['FAIL']} FAIL")
     return "\n".join(lines)

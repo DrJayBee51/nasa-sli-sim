@@ -10,6 +10,9 @@ import argparse
 import sys
 from pathlib import Path
 
+# Puts the project root on the import path so `python scripts/run_nominal.py`
+# works without installing the package first.  It has to run before the slisim
+# imports below, which is what the `noqa: E402` markers acknowledge.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from slisim import analysis, or_bridge as orb, report, requirements as rq  # noqa: E402
@@ -17,6 +20,7 @@ from slisim import rocketpy_model as rpm, units as U  # noqa: E402
 from slisim.config import Site, Vehicle  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "output"
+RULE = "=" * rq.TABLE_WIDTH   # same width as the requirement table it wraps
 
 
 def main() -> int:
@@ -31,7 +35,7 @@ def main() -> int:
     args = ap.parse_args()
 
     vehicle = Vehicle.from_yaml(args.vehicle)
-    site = Site.from_yaml(args.site)
+    site    = Site.from_yaml(args.site)
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)   # gitignored; absent in a fresh clone
 
@@ -41,15 +45,18 @@ def main() -> int:
           f"   Diameter: {U.m_to_in(vehicle.diameter_m):.2f} in")
     print()
 
-    cases = {"min": [vehicle.ballast_min_kg], "max": [vehicle.ballast_max_kg],
+    # Which ballast masses to fly.  A dict indexed by the flag rather than an
+    # if/elif chain, because argparse has already limited it to these keys.
+    cases = {"min":  [vehicle.ballast_min_kg],
+             "max":  [vehicle.ballast_max_kg],
              "both": [vehicle.ballast_min_kg, vehicle.ballast_max_kg]}[args.ballast]
 
     overall_ok = True
     for ballast in cases:
         label = f"ballast {U.kg_to_lb(ballast):.2f} lb"
-        print("=" * 104)
+        print(RULE)
         print(f"  {label}")
-        print("=" * 104)
+        print(RULE)
 
         doc, rocket, _mount, motor = orb.build_document(vehicle, ballast)
         ork = out_dir / f"{vehicle.name.lower().replace(' ', '_')}_{U.kg_to_lb(ballast):.0f}lb.ork"
@@ -61,8 +68,8 @@ def main() -> int:
         print(f"  Saved   : {ork}")
         print()
 
-        or_res = orb.run_simulation(orb.make_simulation(doc, rocket, site),
-                                    rocket, keep_series=True)
+        sim = orb.make_simulation(doc, rocket, site)
+        or_res = orb.run_simulation(sim, rocket, keep_series=True)
         results = {"OpenRocket": or_res}
 
         if not args.skip_rocketpy:
@@ -98,7 +105,7 @@ def main() -> int:
         print(f"  Figures written to {out_dir}")
         print()
 
-    print("=" * 104)
+    print(RULE)
     print("  RESULT:", "all requirements satisfied" if overall_ok
           else "ONE OR MORE REQUIREMENTS NOT SATISFIED")
     return 0 if overall_ok else 1

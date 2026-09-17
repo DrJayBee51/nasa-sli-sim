@@ -66,7 +66,7 @@ Everything flows from one file:
 | `report.py` | Figures and tables sized for a design review |
 
 Scripts in `scripts/` are thin: they parse arguments, call the library, and
-print. Read `scripts/run_nominal.py` end to end right now — it is about 100
+print. Read `scripts/run_nominal.py` end to end right now — it is about 115
 lines and it names every stage of the pipeline you are about to walk through.
 
 **Answer this:** which of the files above would you have to change to add a new
