@@ -163,7 +163,7 @@ sim/
 └── output/                figures, CSVs, markdown reports
 ```
 
-`config/vehicle.yaml` generates **both** the RocketPy model and a real `.ork`
+`config/vehicles/full_scale.yaml` generates **both** the RocketPy model and a real `.ork`
 file you can open in the OpenRocket GUI. There is no second place to keep in
 sync, and no chance of the two models quietly describing different rockets.
 
@@ -291,7 +291,7 @@ belongs in the Monte Carlo, where the seed genuinely controls the outcome.
 
 ## Status of the template vehicle
 
-`config/vehicle.yaml` is a **placeholder**, not a design — a representative
+`config/vehicles/full_scale.yaml` is a **placeholder**, not a design — a representative
 6", ~40 lb, L1520T-powered vehicle that lands mid-window and passes every
 requirement, so the framework can be exercised before the real design exists.
 Replace the numbers as the 2026–2027 design matures. The `status:` field in that

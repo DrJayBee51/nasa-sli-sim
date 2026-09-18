@@ -30,7 +30,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from slisim import montecarlo, report  # noqa: E402
-from slisim.config import Site, Vehicle, load_uncertainty  # noqa: E402
+from slisim.config import Site, Vehicle, load_uncertainty, output_dir  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "output"
 
@@ -76,8 +76,8 @@ def main() -> int:
     print("Reading nominal mass and motor properties from OpenRocket ...")
     nominals = montecarlo.nominal_values(vehicle, site, ballast)
 
-    png = report.plot_input_distributions(df, Path(args.out), unc, args.engine,
-                                          args.name, nominals)
+    png = report.plot_input_distributions(
+        df, output_dir(args.out, vehicle), unc, args.engine, args.name, nominals)
     print(f"  Wrote {png}")
     return 0
 

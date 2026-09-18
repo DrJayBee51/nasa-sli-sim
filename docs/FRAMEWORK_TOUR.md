@@ -35,7 +35,7 @@ This document explains the *structure*.
 Everything flows from one file:
 
 ```
-                   config/vehicle.yaml
+          config/vehicles/full_scale.yaml
                     (you edit this)
                            |
               +------------+------------+
@@ -76,7 +76,7 @@ requirement check? Which would you *not*?
 
 ## Stop 1 — One file, two models
 
-**Read:** `config/vehicle.yaml`, then in `config.py` the methods
+**Read:** `config/vehicles/full_scale.yaml`, then in `config.py` the methods
 `landing_section_masses_kg`, `recovery_mass_kg`, and `unassigned_members`.
 Then read `check_mass_closure` in `requirements.py`.
 
@@ -137,8 +137,8 @@ what is shared between the two tools and what is not. Then read §1.4 of the
 python scripts/run_crossvalidate.py
 ```
 
-Read `output/crossvalidation.md`, including the discussion of every difference
-over 5%.
+Read `output/<vehicle>/crossvalidation/crossvalidation.md`, including the
+discussion of every difference over 5%.
 
 **Answer these:**
 

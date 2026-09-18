@@ -28,7 +28,7 @@ import pandas as pd  # noqa: E402
 
 from slisim import analysis, montecarlo, or_bridge as orb, report  # noqa: E402
 from slisim import rocketpy_model as rpm, units as U  # noqa: E402
-from slisim.config import Site, Vehicle  # noqa: E402
+from slisim.config import Site, Vehicle, output_dir  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "output"
 
@@ -79,12 +79,13 @@ def main() -> int:
 
     vehicle = Vehicle.from_yaml(args.vehicle)
     site    = Site.from_yaml(args.site)
-    out_dir = Path(args.out)
+    out_dir = output_dir(args.out, vehicle, "crossvalidation")
     ballast = vehicle.ballast_min_kg if args.ballast == "min" else vehicle.ballast_max_kg
     out_dir.mkdir(parents=True, exist_ok=True)   # gitignored; absent in a fresh clone
 
     print(f"Vehicle : {vehicle.name}")
     print(f"Site    : {site.name}")
+    print(f"Output  : {out_dir}")
     print()
 
     # --- nominal, both engines

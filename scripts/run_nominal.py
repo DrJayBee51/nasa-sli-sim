@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from slisim import analysis, or_bridge as orb, report, requirements as rq  # noqa: E402
 from slisim import rocketpy_model as rpm, units as U  # noqa: E402
-from slisim.config import Site, Vehicle  # noqa: E402
+from slisim.config import Site, Vehicle, output_dir  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "output"
 RULE = "=" * rq.TABLE_WIDTH   # same width as the requirement table it wraps
@@ -36,11 +36,12 @@ def main() -> int:
 
     vehicle = Vehicle.from_yaml(args.vehicle)
     site    = Site.from_yaml(args.site)
-    out_dir = Path(args.out)
+    out_dir = output_dir(args.out, vehicle, "nominal")
     out_dir.mkdir(parents=True, exist_ok=True)   # gitignored; absent in a fresh clone
 
     print(f"Vehicle : {vehicle.name}  [{vehicle.status}]")
     print(f"Site    : {site.name}")
+    print(f"Output  : {out_dir}")
     print(f"Length  : {U.m_to_in(vehicle.total_length_m):.1f} in"
           f"   Diameter: {U.m_to_in(vehicle.diameter_m):.2f} in")
     print()

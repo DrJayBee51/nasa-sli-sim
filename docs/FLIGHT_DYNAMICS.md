@@ -15,7 +15,8 @@ read the working equations alone as a reference during a report crunch, or read
 the derivations to understand where they come from.
 
 Numbers labeled *"template vehicle"* are real outputs from the framework for
-the placeholder design in `config/vehicle.yaml` (6.00 in diameter, 103 in long,
+the placeholder design in `config/vehicles/full_scale.yaml` (6.00 in diameter,
+103 in long,
 39.58 lb on the pad, AeroTech L1520T). They are there so you can check your own
 understanding against something concrete, and so you can reproduce them.
 
@@ -1519,5 +1520,6 @@ only when you are checking them by hand.
 ---
 
 *Numerical values are from the framework's template vehicle
-(`config/vehicle.yaml`), reproducible with `python scripts/run_nominal.py`.
+(`config/vehicles/full_scale.yaml`), reproducible with
+`python scripts/run_nominal.py`.
 Verified on OpenRocket 24.12 and RocketPy 1.13.0.*

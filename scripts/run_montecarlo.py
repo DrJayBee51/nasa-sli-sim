@@ -16,7 +16,10 @@ flight -- everything not selected is held at its nominal value:
 from __future__ import annotations
 
 import argparse
+import os
+import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Puts the project root on the import path so `python scripts/run_montecarlo.py`
@@ -25,9 +28,48 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from slisim import analysis, montecarlo, or_bridge as orb, report, units as U  # noqa: E402
-from slisim.config import Site, Vehicle, load_uncertainty  # noqa: E402
+from slisim.config import Site, Vehicle, load_uncertainty, output_dir  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "output"
+
+
+def _refresh_latest(run_dir: Path) -> None:
+    """Point `<vehicle>/mc/latest/` at the run just written.
+
+    A timestamped directory per run means the newest results have a different
+    path every time, which is awkward to document and to remember.  `latest/`
+    is a fixed path that always holds the most recent campaign.
+
+    Copied, not symlinked: a symlink needs Developer Mode or an elevated shell
+    on Windows, and failing to publish the newest run is worse than the disk.
+    """
+    latest = run_dir.parent / "latest"
+    if latest.exists():
+        shutil.rmtree(latest)
+    shutil.copytree(run_dir, latest)
+    print(f"  Wrote {latest}{os.sep}  (copy of this run)")
+
+
+def _sigma_record(unc: dict) -> str:
+    """The dispersions this run actually used, for the report.
+
+    Recorded because the run directory's name cannot capture them: two
+    campaigns identical except for an edited sigma would be indistinguishable
+    afterwards, and "which uncertainty.yaml produced this" is exactly the
+    question a reviewer asks.
+    """
+    lines = []
+    for name, spec in sorted(unc.items()):
+        dist = spec.get("distribution", "normal")
+        if dist == "uniform":
+            spread = f"uniform[{spec['low']:g}, {spec['high']:g}]"
+        else:
+            sigma = spec.get("sigma")
+            spread = f"{dist}, sigma={'site' if sigma is None else f'{sigma:g}'}"
+            if spec.get("relative"):
+                spread += " (relative)"
+        lines.append(f"| `{name}` | {spread} |")
+    return "| Parameter | Dispersion |\n|---|---|\n" + "\n".join(lines)
 
 
 def _names(arg: str | None) -> list[str] | None:
@@ -117,9 +159,13 @@ def main() -> int:
 
     vehicle   = Vehicle.from_yaml(args.vehicle)
     site      = Site.from_yaml(args.site)
-    out_dir   = Path(args.out)
+    out_dir   = output_dir(args.out, vehicle, "mc")
     ballast   = vehicle.ballast_min_kg if args.ballast == "min" else vehicle.ballast_max_kg
     target_ft = U.m_to_ft(vehicle.target_apogee_m)
+    # Local time, not UTC: students compare these against their own lab clock.
+    # Seconds included because editing one sigma and re-running takes well under
+    # a minute, and that is exactly the pair you least want collapsed together.
+    args.run_stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
     print(f"Vehicle : {vehicle.name}  [{vehicle.status}]")
     print(f"Site    : {site.name}")
@@ -186,19 +232,25 @@ def main() -> int:
     print()
 
     # --- artifacts
-    out_dir.mkdir(parents=True, exist_ok=True)
+    #  Each campaign gets its own timestamped directory.  The tag below records
+    #  engine, N, ballast and the subset, but NOT the sigmas: two runs that
+    #  differ only in an edited uncertainty.yaml would otherwise write the same
+    #  filenames, and the second would erase the first.  Comparing dispersion
+    #  configurations is a normal thing to do, so it must not be destructive.
+    run_dir = out_dir / f"{args.run_stamp}_n{args.samples}_{args.engine}"
+    run_dir.mkdir(parents=True, exist_ok=True)
     tag = (f"{args.engine}_n{args.samples}_{args.ballast}"
            f"{_subset_tag(only, freeze)}")
-    csv = out_dir / f"montecarlo_{tag}.csv"
+    csv = run_dir / f"montecarlo_{tag}.csv"
     df.to_csv(csv, index=False)
 
-    report.plot_apogee_distribution(df, out_dir, target_ft, f"apogee_dist_{tag}.png")
-    report.plot_landing_scatter(df, out_dir, ell, f"landing_{tag}.png")
-    report.plot_sensitivity(sens.head(12), out_dir, "apogee", f"sensitivity_{tag}.png")
-    report.plot_input_distributions(df, out_dir, unc, args.engine, f"inputs_{tag}.png")
+    report.plot_apogee_distribution(df, run_dir, target_ft, f"apogee_dist_{tag}.png")
+    report.plot_landing_scatter(df, run_dir, ell, f"landing_{tag}.png")
+    report.plot_sensitivity(sens.head(12), run_dir, "apogee", f"sensitivity_{tag}.png")
+    report.plot_input_distributions(df, run_dir, unc, args.engine, f"inputs_{tag}.png")
 
     report.write_markdown(
-        out_dir / f"montecarlo_{tag}.md",
+        run_dir / f"montecarlo_{tag}.md",
         f"Monte Carlo dispersion - {vehicle.name}",
         [
             ("Configuration",
@@ -211,6 +263,7 @@ def main() -> int:
              f"- Dispersed: {', '.join(dispersed)}\n"
              f"- Held nominal: {', '.join(held) or 'none'}\n"
              f"- Failed cases: {failed}"),
+            ("Dispersions used", _sigma_record(unc)),
             ("Dispersion summary",
              report.table(stats.reset_index().rename(columns={"index": "quantity"}), "{:.2f}")),
             ("Requirement compliance", report.table(comp, "{:.3f}")),
@@ -227,7 +280,8 @@ def main() -> int:
         ],
     )
     print(f"  Wrote {csv}")
-    print(f"  Wrote {out_dir / f'montecarlo_{tag}.md'}")
+    print(f"  Wrote {run_dir / f'montecarlo_{tag}.md'}")
+    _refresh_latest(run_dir)
     return 0
 
 

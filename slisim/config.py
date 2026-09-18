@@ -9,6 +9,7 @@ balance exactly.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -18,11 +19,65 @@ import yaml
 from . import units as U
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+VEHICLE_DIR = CONFIG_DIR / "vehicles"
 
 
 def _load_yaml(path: Path) -> dict:
     with open(path, "r", encoding="utf-8") as fh:
         return yaml.safe_load(fh)
+
+
+def default_vehicle_path() -> Path:
+    """The vehicle used when no --vehicle is given.
+
+    A team carries several vehicles at once -- full-scale, subscale, and the
+    layout options behind a PDR decision -- so they live in config/vehicles/ and
+    are chosen per run.  `full_scale.yaml` is the default because it is the one
+    every requirement is actually scored against.
+
+    The pre-split `config/vehicle.yaml` still wins if it exists, so a branch or
+    working copy from before the move keeps running.
+    """
+    legacy = CONFIG_DIR / "vehicle.yaml"
+    if legacy.is_file():
+        return legacy
+    return VEHICLE_DIR / "full_scale.yaml"
+
+
+def available_vehicles() -> list[Path]:
+    """Every vehicle definition, for listing in a --help or an error message."""
+    return sorted(VEHICLE_DIR.glob("*.yaml"))
+
+
+def slug(text: str) -> str:
+    """A filesystem-safe stem: 'Template Full-Scale' -> 'template_full_scale'.
+
+    Used for the per-vehicle output directory, so two vehicles cannot overwrite
+    each other's figures.
+    """
+    keep = [c.lower() if c.isalnum() else "_" for c in text.strip()]
+    return re.sub(r"_+", "_", "".join(keep)).strip("_") or "vehicle"
+
+
+def output_dir(base: str | Path, vehicle: "Vehicle | None" = None,
+               kind: str = "") -> Path:
+    """Where one run's files belong: `base/<vehicle>/<kind>`.
+
+    Splitting by vehicle is not tidiness -- most output filenames do not name
+    the vehicle, so a subscale run and a full-scale run would otherwise write
+    the same `flight_profile_0lb.png` and silently overwrite each other.  That
+    is at its worst comparing two PDR layouts, where the mistake looks like a
+    result.
+
+    The vehicle level is appended even under an explicit `--out`, so the
+    protection cannot be defeated by forgetting a flag.  One rule, always.
+    """
+    path = Path(base)
+    if vehicle is not None:
+        path = path / vehicle.slug
+    if kind:
+        path = path / kind
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +155,7 @@ class Vehicle:
     # ------------------------------------------------------------------
     @classmethod
     def from_yaml(cls, path: str | Path | None = None) -> "Vehicle":
-        path = Path(path) if path else CONFIG_DIR / "vehicle.yaml"
+        path = Path(path) if path else default_vehicle_path()
         d = _load_yaml(path)
 
         af, nc, fn = d["airframe"], d["nose_cone"], d["fins"]
@@ -202,6 +257,11 @@ class Vehicle:
             + self.fin_mass_kg
             + ballast_kg
         )
+
+    @property
+    def slug(self) -> str:
+        """Filesystem-safe form of `name`, for this vehicle's output directory."""
+        return slug(self.name)
 
     def recovery_mass_kg(self) -> float:
         return self.drogue["mass_kg"] + self.main["mass_kg"] + self.shock_cord_mass_kg

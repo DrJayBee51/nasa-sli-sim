@@ -62,7 +62,8 @@ Work through this at a keyboard. Roughly 30 minutes.
 python scripts/run_nominal.py
 ```
 
-This builds the vehicle from `config/vehicle.yaml`, writes a `.ork`, flies it in
+This builds the vehicle from `config/vehicles/full_scale.yaml`, writes a `.ork`,
+flies it in
 both engines, and checks every requirement. Three blocks of output:
 
 **Block 1 — the vehicle.**
@@ -72,7 +73,7 @@ Vehicle : Template Full-Scale  [PLACEHOLDER - not a real design]
 Site    : Bragg Farms, Toney AL (NASA Student Launch competition site)
 Length  : 103.0 in   Diameter: 6.00 in
   Motor   : L1520T (AeroTech)  3769 N-s, 1.773 kg propellant
-  Saved   : ...\output\template_full-scale_0lb.ork
+  Saved   : ...\output\template_full_scale\nominal\template_full-scale_0lb.ork
 ```
 
 That `.ork` is a real OpenRocket file. **Open it in the GUI now** — it is the
@@ -171,11 +172,11 @@ Search more broadly with `python scripts/list_motors.py L1` or filter with
 python scripts/run_crossvalidate.py
 ```
 
-Produces `output/crossvalidation.md` — a report-ready document containing the
-comparison table, the honest scope statement about what is independent, and a
-written discussion of each difference over 5%. Anything differing by more than
-5% that is *not* on the known-differences list is flagged as **unexplained**,
-which is your cue to investigate before citing the number.
+Produces `output/<vehicle>/crossvalidation/crossvalidation.md` — a report-ready
+document containing the comparison table, the honest scope statement about what
+is independent, and a written discussion of each difference over 5%. Anything
+differing by more than 5% that is *not* on the known-differences list is flagged
+as **unexplained**, which is your cue to investigate before citing the number.
 
 ## 1.5 Your first Monte Carlo
 
@@ -263,9 +264,50 @@ is how you know the tool works before you trust it with real data.
 
 # Part 2 — Defining your vehicle
 
-Everything lives in `config/vehicle.yaml`, authored in **inches and pounds**
-because that is how the handbook is written and how the team thinks. Conversion
-to SI happens once, in `slisim/units.py`.
+Vehicles live in `config/vehicles/`, authored in **inches and pounds** because
+that is how the handbook is written and how the team thinks. Conversion to SI
+happens once, in `slisim/units.py`.
+
+## 2.0 Carrying several vehicles at once
+
+You will not have one rocket. You will have the full-scale, the subscale that
+requirements 2.15 and 2.16 oblige you to fly, and — around PDR — two or three
+layout options you are deciding between. All of them exist at the same time, so
+each one is a file:
+
+```
+config/vehicles/
+├── full_scale.yaml        the design you are scored on (the default)
+├── subscale.yaml          req 2.15/2.16: >= E impulse, <= 75% scale
+├── pdr_option_a.yaml      4-fin trade
+└── pdr_option_b.yaml      3-fin trade
+```
+
+Every script takes `--vehicle`; with no flag you get `full_scale.yaml`:
+
+```bash
+python scripts/run_nominal.py
+python scripts/run_nominal.py --vehicle config/vehicles/subscale.yaml
+```
+
+**Use files, not branches.** A branch says "this replaces that", which is true
+of a code experiment and false of your vehicles: subscale and full-scale coexist
+all season, and neither ever merges into the other. On separate branches you
+cannot plot two PDR options against each other without checking out, running,
+stashing, and switching; a mass correction has to be cherry-picked into every
+branch by hand; and `git log config/vehicles/subscale.yaml` stops being able to
+tell you what the subscale weighed at CDR. Branches are still right for trying a
+change to the *code*.
+
+To add one, copy the closest existing file and edit it:
+
+```bash
+cp config/vehicles/full_scale.yaml config/vehicles/pdr_option_b.yaml
+```
+
+Change `name:` first. **Output directories are derived from that name**, so two
+vehicles sharing a name overwrite each other — which is the one mistake this
+layout exists to prevent (§5.0).
 
 ## 2.1 Airframe and nose cone
 
@@ -588,7 +630,40 @@ The script refuses that rather than printing a distribution with no width.
 
 # Part 5 — Reading the output
 
-Everything lands in `output/`.
+## 5.0 Where things land
+
+`output/` is organized by vehicle, then by what produced the files:
+
+```
+output/
+├── full_scale/
+│   ├── nominal/                          run_nominal.py
+│   ├── crossvalidation/                  run_crossvalidate.py
+│   ├── input_model.png                   plot_inputs.py
+│   └── mc/                               run_montecarlo.py
+│       ├── 2026-09-18_143458_n1000_rocketpy/
+│       ├── 2026-09-18_151203_n1000_rocketpy/
+│       └── latest/        <- a copy of the most recent run
+└── subscale/
+    └── ...
+```
+
+**Why the vehicle level exists.** Most output filenames do not name the vehicle
+— `flight_profile_0lb.png` is the same string whichever rocket you flew — so
+without it a subscale run would overwrite your full-scale figures. That is at
+its worst when comparing two PDR layouts, where the mistake does not look like
+an error; it looks like a result.
+
+**Why each Monte Carlo gets a dated folder.** The folder name records the time,
+case count, and engine, but nothing about `uncertainty.yaml`. Edit one sigma,
+re-run with the same flags, and the old campaign would otherwise be gone —
+exactly when you are trying to compare dispersion configurations. Each run's
+`montecarlo_*.md` lists the dispersions it used, so two folders are always
+distinguishable after the fact.
+
+`latest/` is a copy, not a symlink, so it works without Developer Mode on
+Windows. Reference it when you want "the newest results" and the dated folder
+when you mean one specific campaign.
 
 | File | Contents |
 |---|---|
@@ -602,10 +677,27 @@ Everything lands in `output/`.
 | `input_model.png` | Histogram per parameter the framework *can* disperse (`plot_inputs.py`) |
 | `crossvalidation.md` | Report-ready engine comparison |
 | `montecarlo_*.csv` | Every case, every input and output — for your own analysis (the Rainbow CSV extension makes these readable in VS Code) |
-| `montecarlo_*.md` | Report-ready dispersion summary |
+| `montecarlo_*.md` | Report-ready dispersion summary, including the dispersions used |
 
 Every one of those PNGs is drawn by a function in `slisim/report.py`. Section
 5.4 explains how they are put together and 5.5 how to change them.
+
+### Comparing two vehicles
+
+Because the paths differ and the filenames do not, comparing is just two runs:
+
+```bash
+python scripts/run_nominal.py --vehicle config/vehicles/pdr_option_a.yaml
+python scripts/run_nominal.py --vehicle config/vehicles/pdr_option_b.yaml
+```
+
+```
+output/pdr_option_a/nominal/flight_profile_0lb.png
+output/pdr_option_b/nominal/flight_profile_0lb.png
+```
+
+Open both in VS Code and use split view, or put them side by side in the trade
+study. Nothing was overwritten, and neither run needed a `--out` flag.
 
 ## 5.1 The apogee distribution
 
@@ -908,13 +1000,18 @@ fits a straight line over each descent phase instead. Keep it that way.
 
 # Part 7 — Command reference
 
+Every script takes `--vehicle PATH` (default `config/vehicles/full_scale.yaml`)
+and `--out DIR` (default `output/`). Output always lands under
+`<out>/<vehicle>/`, so two vehicles never overwrite each other — see
+[§5.0](#50-where-things-land).
+
 ### `run_nominal.py`
 
 Nominal flight in both engines with full requirement checking.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--vehicle PATH` | `config/vehicle.yaml` | Alternate vehicle file |
+| `--vehicle PATH` | `config/vehicles/full_scale.yaml` | Which vehicle to run |
 | `--site KEY` | site file default | Launch site |
 | `--ballast {min,max,both}` | `min` | Ballast configuration |
 | `--skip-rocketpy` | off | OpenRocket only (faster) |
@@ -1006,7 +1103,7 @@ makes the figure trustworthy. Exits non-zero if they diverge.
 # Every session (git basics: SETUP_GUIDE.md §2.3)
 git pull                                          # before you start
 git status                                        # what have I changed
-git add config/vehicle.yaml                       # choose what to save
+git add config/vehicles/full_scale.yaml           # choose what to save
 git commit -m "why this change"
 git push                                          # when you stop
 
@@ -1018,14 +1115,18 @@ python scripts/plot_inputs.py                     # the uncertainty model
 python scripts/run_crossvalidate.py               # report table
 python scripts/fit_cd.py data/flights/vdf.csv --wind 11 --temp-f 64
 
+# Pick a vehicle (default: full_scale.yaml)
+python scripts/run_nominal.py --vehicle config/vehicles/subscale.yaml
+
 # Files you edit
-config/vehicle.yaml       the rocket
+config/vehicles/*.yaml    the rockets, one file each
 config/sites.yaml         where you fly
 config/uncertainty.yaml   what you don't know
 
 # Files you read
-output/*.md               report-ready
-output/*.png              figures
+output/<vehicle>/nominal/            design check
+output/<vehicle>/mc/latest/          newest Monte Carlo
+output/<vehicle>/crossvalidation/    engine comparison
 output/*.csv              raw data
 output/*.ork              open in OpenRocket GUI
 ```

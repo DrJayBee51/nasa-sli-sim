@@ -105,14 +105,14 @@ Using both gets you two things at once:
 
 ## 1.3 How the framework is organized
 
-The central design decision is that **`config/vehicle.yaml` is the single
+The central design decision is that **`config/vehicles/full_scale.yaml` is the single
 source of truth.** From that one file the framework generates:
 
 - a RocketPy model, built in memory, and
 - a real `.ork` file you can open in the OpenRocket GUI.
 
 ```
-                   config/vehicle.yaml
+            config/vehicles/full_scale.yaml
                     (you edit this)
                            |
               +------------+------------+
@@ -263,10 +263,10 @@ Two habits matter more than any command below:
 
 ```bash
 git pull                       # start with everyone else's latest work
-# ... edit config/vehicle.yaml, run some analyses ...
+# ... edit config/vehicles/full_scale.yaml, run some analyses ...
 git status                     # what did I change?
 git diff                       # exactly what, line by line
-git add config/vehicle.yaml    # choose what goes in this snapshot
+git add config/vehicles/full_scale.yaml   # choose what goes in this snapshot
 git commit -m "Raise fin span to 7.5 in for stability margin"
 git push                       # share it
 ```
@@ -328,7 +328,7 @@ Above the `=======` is what was there; below is what is arriving. Delete the
 markers, leave the version you want (or write a third), then:
 
 ```bash
-git add config/vehicle.yaml
+git add config/vehicles/full_scale.yaml
 git commit
 ```
 
@@ -340,11 +340,11 @@ not an error — it is git refusing to guess which rocket you meant.
 
 | Situation | Command |
 |---|---|
-| Discard changes to one file | `git restore config/vehicle.yaml` |
+| Discard changes to one file | `git restore config/vehicles/full_scale.yaml` |
 | Unstage something added by mistake | `git restore --staged <file>` |
 | Fix the last commit's message | `git commit --amend` |
 | Set the work aside, temporarily | `git stash`, then `git stash pop` |
-| See what a file looked like before | `git log -p config/vehicle.yaml` |
+| See what a file looked like before | `git log -p config/vehicles/full_scale.yaml` |
 
 `git restore` throws work away permanently, so read `git status` first. Once
 something is committed it is recoverable; before that, it is not.
