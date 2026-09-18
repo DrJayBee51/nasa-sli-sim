@@ -205,6 +205,34 @@ def _prepare(vehicle: Vehicle, site: Site, ballast_kg: float) -> dict[str, Any]:
     return prepared
 
 
+def nominal_values(vehicle: Vehicle, site: Site, ballast_kg: float) -> dict[str, float]:
+    """The nominal each relative/shift parameter perturbs, in the sample's own units.
+
+    A sample records what was *drawn* -- 1.0169 for dry_mass, -0.4 for cg_shift --
+    which says nothing about the quantity itself.  Pairing each draw with the
+    value it multiplies or shifts is what lets a figure report pounds and inches
+    instead of "x nominal".
+
+    Absent keys are parameters already drawn in absolute units (wind, pressure,
+    rail angle), or ones with no single nominal: drag_coefficient scales a whole
+    Cd-vs-Mach curve, so there is no one number to report.
+    """
+    prep = _prepare(vehicle, site, ballast_kg)
+    mi, mp = prep["motor_info"], prep["mass_props"]
+    return {
+        # Exactly the quantities rocketpy_model.build_rocket scales or shifts.
+        "dry_mass": mp["mass_kg"],
+        "cg_shift": mp["cg_from_nose_m"],
+        "motor_total_impulse": float(mi["total_impulse_ns"]),
+        "motor_burn_time": float(mi["burn_time_s"]),
+        "motor_dry_mass": float(mi["burnout_mass_kg"]),
+        "drogue_cd": vehicle.drogue["cd"],
+        "main_cd": vehicle.main["cd"],
+        "main_deploy_altitude_ft": U.m_to_ft(vehicle.main["deploy_altitude_m"]),
+        "drogue_deploy_delay_s": vehicle.drogue["deploy_delay_s"],
+    }
+
+
 def _overrides_from(sample: dict[str, float]) -> dict[str, float]:
     """Translate a sample into launch-condition overrides both engines accept."""
     return {
@@ -331,4 +359,5 @@ def run_montecarlo(vehicle: Vehicle, site: Site, n: int = 500,
     df.attrs["n"] = n
     df.attrs["ballast_kg"] = ballast_kg
     df.attrs["site"] = site.key
+    df.attrs["nominals"] = nominal_values(vehicle, site, ballast_kg)
     return df

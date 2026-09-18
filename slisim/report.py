@@ -179,10 +179,36 @@ INPUT_GROUPS: list[tuple[str, tuple[str, ...]]] = [
                   "drogue_deploy_delay_s")),
 ]
 
-# Axis units by name suffix.  Parameters declared `relative: true` are sampled
-# as multipliers on the nominal, so they are dimensionless and handled first.
+# Axis units by name suffix, for parameters already drawn in absolute units.
 _UNIT_BY_SUFFIX = {"_deg": "deg", "_mps": "m/s", "_k": "K", "_pa": "Pa",
-                   "_ft": "ft", "_s": "s", "_cd": "x nominal", "_mass": "x nominal"}
+                   "_ft": "ft", "_s": "s"}
+
+# How to turn a draw into the quantity it perturbs, given that parameter's
+# nominal.  `kind` is "scale" (draw multiplies the nominal) or "shift" (draw is
+# added to it); `to` converts the SI result into the unit the label names.
+#
+# drag_coefficient is deliberately absent: it scales an entire Cd-vs-Mach curve,
+# so it has no single absolute value and stays dimensionless.  Anything absent
+# here is plotted exactly as drawn.
+_ABSOLUTE: dict[str, tuple[str, str, object]] = {
+    "dry_mass":                ("scale", "lb",          U.kg_to_lb),
+    "cg_shift":                ("shift", "in from nose", U.m_to_in),
+    "motor_total_impulse":     ("scale", "N-s",         None),
+    "motor_burn_time":         ("scale", "s",           None),
+    "motor_dry_mass":          ("scale", "lb",          U.kg_to_lb),
+    "drogue_cd":               ("scale", "Cd",          None),
+    "main_cd":                 ("scale", "Cd",          None),
+    "main_deploy_altitude_ft": ("shift", "ft AGL",      None),
+    "drogue_deploy_delay_s":   ("shift", "s",           None),
+}
+
+# Shown instead of the raw key where the absolute quantity is a different thing
+# from the perturbation, rather than the same thing in real units.
+_ABSOLUTE_TITLE = {"cg_shift": "cg position",
+                   "main_deploy_altitude_ft": "main deploy altitude",
+                   "drogue_deploy_delay_s": "drogue deploy delay",
+                   "dry_mass": "dry mass",
+                   "motor_dry_mass": "motor burnout mass"}
 
 
 def _input_unit(param: str, spec: dict | None) -> str:
@@ -194,11 +220,50 @@ def _input_unit(param: str, spec: dict | None) -> str:
     return ""
 
 
+def _to_absolute(param: str, drawn: pd.Series, nominal: float | None,
+                 sigma: float | None) -> tuple[pd.Series, str, str, float | None]:
+    """Convert a column of draws into the absolute quantity it perturbs.
+
+    Returns (values, unit, title, sigma), where `sigma` is the YAML's requested
+    sigma carried into the same units as `values` -- a relative sigma scaled by
+    the nominal, an absolute one converted alongside it.  Leaving it in the
+    draw's units would print 0.01 (m) beside an axis in inches and read as a
+    sampler fault when nothing is wrong.
+
+    Falls back to the draw as-is when the nominal is unavailable -- an older CSV
+    written before run_montecarlo recorded the nominal_* columns -- so an
+    archived campaign still plots, labeled as the relative quantity it is.
+    """
+    rule = _ABSOLUTE.get(param)
+    title = param.replace("_", " ")
+    if rule is None or nominal is None:
+        relative = rule is not None and rule[0] == "scale"
+        return (drawn, "x nominal" if relative else _input_unit(param, None),
+                title, sigma)
+
+    kind, unit, convert = rule
+    if kind == "scale":
+        absolute = drawn * nominal
+        sigma = None if sigma is None else sigma * abs(nominal)
+    else:
+        absolute = drawn + nominal
+    if convert is not None:                 # same conversion for both, or the
+        absolute = convert(absolute)        # comparison is unit-mismatched
+        sigma = None if sigma is None else convert(sigma)
+    return absolute, unit, _ABSOLUTE_TITLE.get(param, title), sigma
+
+
 def plot_input_distributions(df: pd.DataFrame, out_dir: Path,
                              uncertainty: dict | None = None,
                              engine: str = "rocketpy",
-                             name: str = "input_distributions.png") -> Path:
+                             name: str = "input_distributions.png",
+                             nominals: dict[str, float] | None = None) -> Path:
     """Histogram per dispersed input, grouped as in config/uncertainty.yaml.
+
+    `df` needs only the `in_*` sample columns, so it can come either from a
+    campaign (where frozen parameters collapse and drop out, showing what that
+    run actually varied) or straight from `draw_sample` (where every parameter
+    varies, showing the uncertainty model itself).
 
     This is the figure that shows a reviewer *what was actually sampled*, which
     is the half of a Monte Carlo that dispersion summaries leave out: the output
@@ -215,8 +280,14 @@ def plot_input_distributions(df: pd.DataFrame, out_dir: Path,
     only those six, so plotting the rest would credit them with scatter they did
     not cause.
     """
-    ok = df[df.get("ok", True) == True]  # noqa: E712
+    # Sample-only frames (straight from draw_sample) have no "ok" column: there
+    # were no flights to succeed or fail, so every row counts.
+    ok = df[df["ok"].astype(bool)] if "ok" in df.columns else df
     ins = {c[len("in_"):]: c for c in df.columns if c.startswith("in_")}
+
+    # Whatever the caller knows; df.attrs when run_montecarlo produced the frame.
+    # Absent entries fall back to relative axes in _to_absolute.
+    nominals = nominals or df.attrs.get("nominals") or {}
 
     consumed = mc.OPENROCKET_PARAMETERS if engine == "openrocket" else set(ins)
     ignored = sorted(p for p in ins if p not in consumed)
@@ -254,19 +325,22 @@ def plot_input_distributions(df: pd.DataFrame, out_dir: Path,
                 continue
 
             param = params[c]
-            v = ok[ins[param]].astype(float)
             spec = (uncertainty or {}).get(param)
+            # None, null, or 0.0 in the YAML all mean "nothing to compare".
+            requested = (spec or {}).get("sigma") or None
+            v, unit, title, requested = _to_absolute(
+                param, ok[ins[param]].astype(float), nominals.get(param),
+                None if requested is None else float(requested))
+
             # Sturges-ish, floored so a 50-case pilot run still shows a shape.
             ax.hist(v, bins=min(30, max(8, int(np.sqrt(len(v))))),
                     color=ACCENT, alpha=0.75, edgecolor="white", linewidth=0.5)
             ax.axvline(v.mean(), color=FAIL_C, lw=1.3)
 
             sigma = f"sd {v.std():.3g}"
-            requested = None if spec is None else spec.get("sigma")
-            if requested:                      # None, null, or 0.0 -> nothing to compare
-                sigma += f" (req {float(requested):.3g})"
-            _style(ax, f"{param.replace('_', ' ')}\n{sigma}",
-                   _input_unit(param, spec), "")
+            if requested is not None:
+                sigma += f" (req {requested:.3g})"
+            _style(ax, f"{title}\n{sigma}", unit, "")
             # Wide absolute ranges (pressure in Pa) otherwise overprint.
             ax.ticklabel_format(axis="x", style="sci", scilimits=(-3, 4),
                                 useOffset=False)
@@ -282,7 +356,9 @@ def plot_input_distributions(df: pd.DataFrame, out_dir: Path,
     # grid because _save crops with bbox_inches="tight": a caption wider than the
     # panels would widen the entire figure.
     width = max(46, 34 * ncols)
-    head = f"Sampled inputs, N={len(ok)} successful cases"
+    # "cases" only when flights were run; a sample-only frame has no outcomes.
+    noun = "successful cases" if "ok" in df.columns else "draws"
+    head = f"Sampled inputs, N={len(ok)} {noun}"
     if engine == "openrocket":
         head += " -- OpenRocket, launch conditions only"
     lines = textwrap.wrap(head, width)

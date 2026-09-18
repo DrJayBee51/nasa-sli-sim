@@ -7,11 +7,9 @@ This guide covers using the framework once it is installed: a guided first
 run, defining your vehicle, launch sites, Monte Carlo dispersion, reading the
 output, and how the tools fit the season's milestones. If you have not
 installed it yet, start with the [Setup Guide](SETUP_GUIDE.md). Everything here
-assumes its verification step (§2.8) passes.
+assumes its verification step (§2.9) passes.
 
-Read Part 0 first if git is new to you — it is short, and it is what keeps
-several people editing the same config files from stepping on each other. Then
-work through Part 1 at a keyboard: about 30 minutes, and the fastest way to
+Work through Part 1 at a keyboard: about 30 minutes, and the fastest way to
 understand what the framework does.
 
 Every step here is a command typed into a terminal and run from the project
@@ -24,7 +22,7 @@ in the Setup Guide if that is unfamiliar.
 VS Code (Ctrl+`), because the file tree, the editor, and the commands then
 share one window — you can edit `vehicle.yaml`, run a flight, and open the
 resulting figure without leaving it. Set that up in
-[§2.6 of the Setup Guide](SETUP_GUIDE.md#26-visual-studio-code-recommended).
+[§2.7 of the Setup Guide](SETUP_GUIDE.md#27-visual-studio-code-recommended).
 Any other terminal works identically; nothing below depends on VS Code.
 
 > **Shorthand.** This guide writes `python` for whichever of
@@ -42,165 +40,15 @@ explains the physics behind everything here.
 
 ## Table of contents
 
-- [Part 0 — Working with git](#part-0--working-with-git)
 - [Part 1 — Guided first run](#part-1--guided-first-run)
 - [Part 2 — Defining your vehicle](#part-2--defining-your-vehicle)
 - [Part 3 — Launch sites](#part-3--launch-sites)
 - [Part 4 — Uncertainty and Monte Carlo](#part-4--uncertainty-and-monte-carlo)
 - [Part 5 — Reading the output](#part-5--reading-the-output)
-- [Part 6 — Season workflow](#part-6--season-workflow)
-- [Part 7 — Troubleshooting](#part-7--troubleshooting)
-- [Part 8 — Command reference](#part-8--command-reference)
+- [Part 6 — Troubleshooting](#part-6--troubleshooting)
+- [Part 7 — Command reference](#part-7--command-reference)
 - [Appendix A — Cheat sheet](#appendix-a--cheat-sheet)
 - [Appendix B — Glossary](#appendix-b--glossary)
-
----
-
-# Part 0 — Working with git
-
-Read this once before you change anything. Several of you will edit the same
-three config files this season, and git is what keeps that from turning into
-"final_v3_ACTUAL.yaml" passed around on Discord.
-
-## 0.1 What git is doing
-
-Your project folder is an ordinary folder you edit normally. Git adds a
-**history**: a series of snapshots, each with a message saying what changed and
-why. Nothing enters that history unless you put it there, in two deliberate
-steps.
-
-```
-  working tree          staging area            history            GitHub
-  (your files)   --->   (what goes in    --->   (snapshots   --->  (the team's
-                         the next save)          on your           shared copy)
-        edit             git add                 machine)          git push
-                                                 git commit
-```
-
-Two steps rather than one looks fussy, but it means you decide what belongs in
-a snapshot. You can fix three things and record them as three clear commits.
-
-Two habits matter more than any command below:
-
-- **`git status` whenever you are unsure.** It tells you what changed, what is
-  staged, and usually what to type next. It changes nothing, so use it freely.
-- **Commit small and often.** A commit is a point you can return to. Ten small
-  commits are far more useful than one enormous one at 2 a.m. before CDR.
-
-## 0.2 The daily loop
-
-```bash
-git pull                       # start with everyone else's latest work
-# ... edit config/vehicle.yaml, run some analyses ...
-git status                     # what did I change?
-git diff                       # exactly what, line by line
-git add config/vehicle.yaml    # choose what goes in this snapshot
-git commit -m "Raise fin span to 7.5 in for stability margin"
-git push                       # share it
-```
-
-**Pull before you start, push when you stop.** Most git pain comes from
-skipping the first.
-
-**Write messages a teammate can use.** "Raise fin span to 7.5 in for stability
-margin" tells the story; "update" and "stuff" do not. Say *why*, since the
-*what* is already in the diff.
-
-In VS Code, the Source Control panel (Ctrl+Shift+G) does all of this: changed
-files are listed, clicking one shows the diff, `+` stages, the box at the top
-takes the message, and the Sync button pulls and pushes.
-
-## 0.3 Branches
-
-A branch is a separate line of work. The shared one is `main`, and it should
-always be in a state that runs.
-
-Use one whenever you are trying something that might not pan out — a new fin
-geometry, a different motor, a rewrite of the sigmas:
-
-```bash
-git switch -c isabel/fin-trade      # create and move onto it
-# ... work, commit as usual ...
-git push -u origin isabel/fin-trade # first push; later pushes are just `git push`
-```
-
-Name them `yourname/what`, so the branch list stays readable.
-
-When the work is good, merge it into `main` — on GitHub via a pull request,
-which lets someone else look first, or locally:
-
-```bash
-git switch main
-git pull
-git merge isabel/fin-trade
-git push
-```
-
-If it does not pan out, abandon it. `git switch main` and the experiment stays
-out of everyone's way.
-
-## 0.4 When two people edit the same file
-
-Git merges different parts of a file automatically. When two people change the
-*same lines*, it stops and asks, marking the spot like this:
-
-```
-<<<<<<< HEAD
-    height_in: 7.50
-=======
-    height_in: 8.00
->>>>>>> isabel/fin-trade
-```
-
-Above the `=======` is what was there; below is what is arriving. Delete the
-markers, leave the version you want (or write a third), then:
-
-```bash
-git add config/vehicle.yaml
-git commit
-```
-
-VS Code shows conflicts with "Accept Current / Accept Incoming / Accept Both"
-buttons, which is far easier than editing the markers by hand. A conflict is
-not an error — it is git refusing to guess which rocket you meant.
-
-## 0.5 Undoing things
-
-| Situation | Command |
-|---|---|
-| Discard changes to one file | `git restore config/vehicle.yaml` |
-| Unstage something added by mistake | `git restore --staged <file>` |
-| Fix the last commit's message | `git commit --amend` |
-| Set the work aside, temporarily | `git stash`, then `git stash pop` |
-| See what a file looked like before | `git log -p config/vehicle.yaml` |
-
-`git restore` throws work away permanently, so read `git status` first. Once
-something is committed it is recoverable; before that, it is not.
-
-## 0.6 What not to commit
-
-`.gitignore` already keeps out `.venv/`, `output/`, and the 80 MB OpenRocket
-jar. Everything in `output/` is reproducible from the configs and scripts, so
-committing figures adds weight and conflicts for nothing.
-
-Do commit your config changes — `vehicle.yaml`, `sites.yaml`,
-`uncertainty.yaml` are the team's shared record of the design, and the reason
-anyone can reproduce a number you quote in a review.
-
-Never commit a deliberate breakage. [`FRAMEWORK_TOUR.md`](FRAMEWORK_TOUR.md)
-has you break the framework on purpose; `git restore <file>` puts it back.
-
-## 0.7 The five commands you will actually use
-
-```bash
-git status      # what is going on
-git pull        # get everyone's work
-git add <file>  # choose what to save
-git commit -m "message"
-git push        # share it
-```
-
-Everything else can be looked up when you need it.
 
 ---
 
@@ -647,7 +495,7 @@ Replace each one:
 | Parameter | Default σ | How to earn a better number |
 |---|---|---|
 | `dry_mass` | 1.5% | Weigh each section three times; use the observed spread. Then track built-vs-predicted mass all season. |
-| `drag_coefficient` | 7% | Compare OpenRocket vs RocketPy, then **fit from flight data** (Part 6). Expect 2–3% afterward. |
+| `drag_coefficient` | 7% | Compare OpenRocket vs RocketPy, then **fit from flight data** with `fit_cd.py`. Expect 2–3% afterward. |
 | `motor_total_impulse` | 2% | Manufacturer certification data; thrustcurve.org shows lot-to-lot spread. |
 | `wind_speed_mps` | site file | Historical data for the field and month. NOAA/Iowa State Mesonet have archives. |
 | `main_cd` / `drogue_cd` | 10% | Manufacturer data if published; otherwise keep it wide — this is genuinely uncertain. |
@@ -716,7 +564,7 @@ python scripts/run_montecarlo.py -n 1000 --freeze drag_coefficient
 - *Answering "what if we measured this better?"* `--freeze drag_coefficient` is
   the campaign you would have if drag were known perfectly. The difference
   between that spread and the full one is the value of doing the Cd fit in
-  Part 6, in feet of apogee.
+  a post-flight Cd fit, in feet of apogee.
 
 **Held nominal means nominal, not absent.** A frozen parameter is still drawn,
 pinned to its nominal value: relative multipliers to 1.0, shifts to 0.0, and
@@ -750,13 +598,14 @@ Everything lands in `output/`.
 | `apogee_dist_*.png` | Apogee histogram with the requirement window |
 | `landing_*.png` | Landing scatter against the 2,500 ft radius |
 | `sensitivity_*.png` | What drives apogee |
-| `inputs_*.png` | Histogram per dispersed input, observed sd vs the requested sigma |
+| `inputs_*.png` | Histogram per parameter this campaign dispersed |
+| `input_model.png` | Histogram per parameter the framework *can* disperse (`plot_inputs.py`) |
 | `crossvalidation.md` | Report-ready engine comparison |
 | `montecarlo_*.csv` | Every case, every input and output — for your own analysis (the Rainbow CSV extension makes these readable in VS Code) |
 | `montecarlo_*.md` | Report-ready dispersion summary |
 
 Every one of those PNGs is drawn by a function in `slisim/report.py`. Section
-5.5 explains how they are put together and 5.6 how to change them.
+5.4 explains how they are put together and 5.5 how to change them.
 
 ## 5.1 The apogee distribution
 
@@ -805,20 +654,7 @@ Sizing to the vertical rate is defensible and conventional. Knowing how little
 margin that leaves is the useful part — and it is a good thing to raise
 yourselves in a review before a panelist raises it for you.
 
-## 5.4 What goes in which report
-
-| Handbook bullet | Where it comes from |
-|---|---|
-| "Flight profile simulations… altitude, velocity, acceleration vs time" | `flight_profile_*.png` |
-| "Stability margin and simulated CP/CG relationship" | `stability_*.png`, requirement table |
-| "Kinetic energy at landing for each section" | Requirement table, `postflight_kinetic_energy.csv` |
-| "Expected descent time" | Requirement table (3.11) |
-| "Data from a different calculation method" | `crossvalidation.md` |
-| "Discuss any differences" | `crossvalidation.md` discussion section |
-| "Multiple simulations to verify results are precise" | `montecarlo_*.md` |
-| "Estimate Cd utilizing launch data" (FRR) | `postflight_cd_fit.md` |
-
-## 5.5 How the figures are defined
+## 5.4 How the figures are defined
 
 Every figure in `output/` is produced by one function in **`slisim/report.py`**.
 There is no plotting anywhere else in the framework — not in the scripts, not in
@@ -831,17 +667,29 @@ the engine bridges — so that is the only file you need to open.
 | `plot_apogee_distribution` | `apogee_dist_*.png` | `run_montecarlo.py` |
 | `plot_landing_scatter` | `landing_*.png` | `run_montecarlo.py` |
 | `plot_sensitivity` | `sensitivity_*.png` | `run_montecarlo.py` |
-| `plot_input_distributions` | `inputs_*.png` | `run_montecarlo.py` |
+| `plot_input_distributions` | `inputs_*.png`, `input_model.png` | `run_montecarlo.py`, `plot_inputs.py` |
 | `plot_comparison` | `engine_comparison*.png`, `crossvalidation.png` | `run_nominal.py`, `run_crossvalidate.py` |
 
-`inputs_*.png` is the one figure about the *inputs* rather than the results: a
-histogram per dispersed parameter, grouped as in `config/uncertainty.yaml`, with
-the observed standard deviation printed against the sigma the file requested.
-Use it to show a reviewer that the campaign sampled what you said it did — if an
-observed sd disagrees with its requested one by more than sampling noise, the
-run did not do what the YAML asked. Parameters held nominal are left out, and
-under `--engine openrocket` only the six launch conditions appear, because those
-are the only ones that engine consumes
+**The input histograms are the one figure about the *inputs* rather than the
+results.** One histogram per parameter, grouped as in `config/uncertainty.yaml`,
+each showing the quantity the parameter actually perturbs — pounds, N·s, feet
+AGL, inches from the nose — rather than the multiplier that was drawn. Each
+panel prints the observed standard deviation against the sigma the YAML asked
+for; if those disagree by more than sampling noise, the run did not do what the
+file said.
+
+`drag_coefficient` is the exception, and stays dimensionless: it scales an
+entire Cd-vs-Mach curve, so there is no single absolute value to report.
+
+The same function serves two questions, depending on who calls it:
+
+| | Written by | Shows |
+|---|---|---|
+| `inputs_*.png` | `run_montecarlo.py` | what **that campaign** dispersed — `--only` and `--freeze` applied, parameters held nominal left out |
+| `input_model.png` | `plot_inputs.py` | every parameter the framework **can** disperse, straight from `uncertainty.yaml` |
+
+Under `--engine openrocket` both show only the six launch conditions, because
+those are the only ones that engine consumes
 ([§4.4](#44-dispersing-one-parameter-at-a-time)).
 
 **They all have the same four-step shape.** `plot_sensitivity` is the shortest,
@@ -926,7 +774,7 @@ scripts start trying to open windows. If you want to poke at a figure
 interactively, do it in a separate session — see below — not by editing that
 line.
 
-## 5.6 Changing a figure
+## 5.5 Changing a figure
 
 | What you want | What to edit |
 |---|---|
@@ -1006,99 +854,21 @@ review panel, so some of the existing choices are not decoration:
   4,000–6,000 ft band is a picture. With the band, it is evidence.
 - **Say what N is.** The Monte Carlo titles carry `N=` and the pass fraction for
   a reason: a beautiful distribution built from 25 cases is not a result.
-- **Commit the code, not the PNG.** `output/` is in `.gitignore` (Part 0) by
+- **Commit the code, not the PNG.** `output/` is in `.gitignore` by
   design — figures are regenerable, and binary diffs tell a reviewer nothing.
   What belongs in git is the `report.py` change that makes the figure, so anyone
   on the team can reproduce it from the same seed months later.
 
 ---
 
-# Part 6 — Season workflow
-
-## 6.1 Proposal / early PDR
-
-Get a vehicle into `vehicle.yaml` even if half the numbers are estimates. Mark
-`status:` honestly. Run `run_nominal.py --ballast both` on every design
-candidate — a motor and airframe trade study is a loop over `motor.search` and
-`airframe.outer_diameter_in`.
-
-## 6.2 PDR
-
-Run a 1,000-case Monte Carlo. Report P(in window), not a single apogee. Produce
-the cross-validation report. Be explicit about which uncertainties are estimates
-— nobody expects measured sigmas at PDR, but they do expect you to know which
-are which.
-
-## 6.3 CDR — declaring your target altitude
-
-Requirement 2.3 makes this a scored decision, and it is the highest-leverage
-number you will pick all season.
-
-1. Freeze the design as far as you can.
-2. Run 2,000 cases at **both** ballast extremes.
-3. Declare the **median of the distribution you actually intend to fly**.
-4. Plan to use ballast to trim toward that declaration as the built mass firms
-   up.
-
-Declaring the nominal-run apogee is a common and costly mistake: the nominal
-run is not the center of the distribution once asymmetric effects are included.
-
-## 6.4 Subscale flight
-
-Build a subscale `vehicle.yaml` (requirements 2.15, 2.16: minimum E impulse,
-≤75% of full-scale dimensions). Fly it, then run `fit_cd.py` on the altimeter
-data. You will not get the full-scale drag coefficient from a subscale flight —
-Reynolds numbers differ — but you *will* validate that your whole modeling
-process produces the right answer, which is the real purpose.
-
-## 6.5 Vehicle Demonstration Flight — the important one
-
-The FRR asks, verbatim:
-
-> *"Estimate the drag coefficient of the full-scale rocket utilizing launch
-> data. Use this value to run a post-flight simulation."*
-> *"Update your simulated flight model with launch day condition data and
-> compare the predicted flight performance to the actual flight data."*
-
-Record on launch day: wind speed and direction, temperature, barometric
-pressure, rail angle, ballast flown, and the altimeter CSV.
-
-```bash
-python scripts/fit_cd.py data/flights/vdf_2027.csv \
-    --wind 11 --wind-dir 210 --temp-f 64 --pressure-inhg 29.92 \
-    --rail-angle 7 --ballast-lb 2.0 --match ascent
-```
-
-Then **fold the result back into `uncertainty.yaml`**:
-
-```yaml
-drag_coefficient:
-  mean: 1.1728        # <- the fitted value
-  sigma: 0.025        # <- was 0.07 before you had data
-```
-
-Re-run the Monte Carlo. The apogee spread will shrink substantially, because
-drag was your dominant uncertainty. **That is how you improve your altitude
-score** — not by simulating more carefully, but by replacing a guess with a
-measurement.
-
-## 6.6 FRR
-
-Everything above, using as-built masses. Report measured descent rates from the
-altimeter rather than simulated ones — the KE table in `fit_cd.py` output does
-this. Demonstrate refinement since CDR; the shrinking uncertainty band is
-exactly that story, told quantitatively.
-
----
-
-# Part 7 — Troubleshooting
+# Part 6 — Troubleshooting
 
 Installation and environment errors — `ModuleNotFoundError`, Java not found, a
 missing OpenRocket jar, Python 3.14 build failures, a slow first run — are
 covered in [Part 3 of the Setup Guide](SETUP_GUIDE.md#part-3--troubleshooting-the-installation).
 This part covers problems that appear once the framework is running.
 
-## 7.1 Monte Carlo cases fail
+## 6.1 Monte Carlo cases fail
 
 The script reports failures and the most common errors rather than crashing:
 
@@ -1111,14 +881,14 @@ A handful of failures out of hundreds is usually a physically extreme sample
 failures means a dispersion is too wide or a configuration is wrong. Inspect
 `montecarlo_*.csv` — failed rows carry an `error` column.
 
-## 7.2 The simulation aborts immediately
+## 6.2 The simulation aborts immediately
 
 Symptoms: apogee of 0, `Simulation abort` in the events list. Almost always the
 motor is not attached to the flight configuration — check that `motor.search`
 matches a real designation with `list_motors.py`, and that
 `mount_inner_diameter_in` is large enough for the motor's actual diameter.
 
-## 7.3 Parachutes deploy at apogee in RocketPy
+## 6.3 Parachutes deploy at apogee in RocketPy
 
 If the main deploys immediately at apogee instead of at its set altitude, the
 atmosphere model is degenerate. This is fixed in the framework
@@ -1127,7 +897,7 @@ atmosphere model is degenerate. This is fixed in the framework
 atmosphere, which makes barometric height meaningless and fires every
 altitude-triggered parachute the moment the rocket noses over.
 
-## 7.4 Descent rates from real altimeter data look absurd
+## 6.4 Descent rates from real altimeter data look absurd
 
 If measured descent rates come out at 60+ fps under a large main, you are
 differentiating noisy barometric data point-by-point. A few feet of baro noise
@@ -1136,7 +906,7 @@ fits a straight line over each descent phase instead. Keep it that way.
 
 ---
 
-# Part 8 — Command reference
+# Part 7 — Command reference
 
 ### `run_nominal.py`
 
@@ -1172,6 +942,28 @@ Exit code 0 if no requirement FAILs, 1 otherwise — usable in CI.
 |---|---|---|
 | `--mc N` | 0 | Also disperse N cases through *both* engines |
 | `--ballast {min,max}`, `--seed`, `--workers` | | As above |
+
+### `plot_inputs.py`
+
+Draws `input_model.png`: every parameter the framework can disperse, in absolute
+units. Runs no flights — a campaign draws all of its samples up front, so the
+same seed regenerates them exactly. Seconds, plus a one-time JVM start to read
+nominal mass, CG, and motor data from OpenRocket.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-n, --samples N` | 1000 | Draws per parameter |
+| `--seed N` | 12345 | Pass a campaign's seed to plot the values it flew |
+| `--engine {rocketpy,openrocket}` | `rocketpy` | `openrocket` shows only its six launch conditions |
+| `--name FILE` | `input_model.png` | Output filename |
+| `--ballast {min,max}`, `--site KEY`, `--vehicle PATH`, `--out DIR` | | As above |
+
+### `check_plot_inputs.py`
+
+No flags. Flies 20 cases and asserts `plot_inputs.py` regenerates their inputs
+bit-for-bit. Run it after changing `draw_sample`, `run_montecarlo`'s sampling
+loop, or `plot_inputs.py`'s copy of it — those three staying in step is what
+makes the figure trustworthy. Exits non-zero if they diverge.
 
 ### `fit_cd.py`
 
@@ -1211,7 +1003,7 @@ Exit code 0 if no requirement FAILs, 1 otherwise — usable in CI.
 ```bash
 # Setup (once): see SETUP_GUIDE.md
 
-# Every session (Part 0)
+# Every session (git basics: SETUP_GUIDE.md §2.3)
 git pull                                          # before you start
 git status                                        # what have I changed
 git add config/vehicle.yaml                       # choose what to save
@@ -1222,6 +1014,7 @@ git push                                          # when you stop
 python scripts/run_nominal.py --ballast both      # design check
 python scripts/list_motors.py --nasa              # pick a motor
 python scripts/run_montecarlo.py -n 1000          # dispersion
+python scripts/plot_inputs.py                     # the uncertainty model
 python scripts/run_crossvalidate.py               # report table
 python scripts/fit_cd.py data/flights/vdf.csv --wind 11 --temp-f 64
 

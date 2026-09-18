@@ -28,8 +28,8 @@ so you can copy and paste them.
 
 - **Which terminal:** the one built into VS Code is the easiest, because the
   file tree, the code, and the commands then share a single window
-  ([§2.6](#26-visual-studio-code-recommended)). Outside VS Code, use PowerShell
-  on Windows (Git Bash also works; see [§2.3](#23-windows)), or Terminal on
+  ([§2.7](#27-visual-studio-code-recommended)). Outside VS Code, use PowerShell
+  on Windows (Git Bash also works; see [§2.4](#24-windows)), or Terminal on
   macOS and Linux. The commands are identical either way.
 - **Run everything from the project folder**, the one you clone in
   [§2.2](#22-get-the-project-files). Commands like `scripts/run_nominal.py`
@@ -189,9 +189,8 @@ installing a JDK is the dependable route.
 
 The project lives in a Git repository. Cloning it, rather than copying a
 folder, means you can pull the team's changes and share your own. If git is new
-to you, [Part 0 of the User Guide](USER_GUIDE.md#part-0--working-with-git)
-covers the handful of commands you need; you do not need it to finish this
-setup.
+to you, [§2.3](#23-working-with-git) covers the handful of commands you need;
+you do not need it to finish this setup.
 
 **Install Git** if you do not have it:
 
@@ -225,7 +224,157 @@ track empty directories and their contents are too large or are generated:
 `vendor/` (the 80 MB OpenRocket engine, created in the step below) and
 `output/` (created on the first run).
 
-## 2.3 Windows
+## 2.3 Working with git
+
+You have just cloned the repository, so this is the moment to learn the
+handful of git commands you will use all season. Several of you will edit the
+same three config files, and git is what keeps that from turning into
+"final_v3_ACTUAL.yaml" passed around on Discord.
+
+You do not need this section to finish the installation — skip to §2.4 and
+come back once the framework runs.
+
+### 2.3.1 What git is doing
+
+Your project folder is an ordinary folder you edit normally. Git adds a
+**history**: a series of snapshots, each with a message saying what changed and
+why. Nothing enters that history unless you put it there, in two deliberate
+steps.
+
+```
+  working tree          staging area            history            GitHub
+  (your files)   --->   (what goes in    --->   (snapshots   --->  (the team's
+                         the next save)          on your           shared copy)
+        edit             git add                 machine)          git push
+                                                 git commit
+```
+
+Two steps rather than one looks fussy, but it means you decide what belongs in
+a snapshot. You can fix three things and record them as three clear commits.
+
+Two habits matter more than any command below:
+
+- **`git status` whenever you are unsure.** It tells you what changed, what is
+  staged, and usually what to type next. It changes nothing, so use it freely.
+- **Commit small and often.** A commit is a point you can return to. Ten small
+  commits are far more useful than one enormous one at 2 a.m. before CDR.
+
+### 2.3.2 The daily loop
+
+```bash
+git pull                       # start with everyone else's latest work
+# ... edit config/vehicle.yaml, run some analyses ...
+git status                     # what did I change?
+git diff                       # exactly what, line by line
+git add config/vehicle.yaml    # choose what goes in this snapshot
+git commit -m "Raise fin span to 7.5 in for stability margin"
+git push                       # share it
+```
+
+**Pull before you start, push when you stop.** Most git pain comes from
+skipping the first.
+
+**Write messages a teammate can use.** "Raise fin span to 7.5 in for stability
+margin" tells the story; "update" and "stuff" do not. Say *why*, since the
+*what* is already in the diff.
+
+In VS Code, the Source Control panel (Ctrl+Shift+G) does all of this: changed
+files are listed, clicking one shows the diff, `+` stages, the box at the top
+takes the message, and the Sync button pulls and pushes.
+
+### 2.3.3 Branches
+
+A branch is a separate line of work. The shared one is `main`, and it should
+always be in a state that runs.
+
+Use one whenever you are trying something that might not pan out — a new fin
+geometry, a different motor, a rewrite of the sigmas:
+
+```bash
+git switch -c isabel/fin-trade      # create and move onto it
+# ... work, commit as usual ...
+git push -u origin isabel/fin-trade # first push; later pushes are just `git push`
+```
+
+Name them `yourname/what`, so the branch list stays readable.
+
+When the work is good, merge it into `main` — on GitHub via a pull request,
+which lets someone else look first, or locally:
+
+```bash
+git switch main
+git pull
+git merge isabel/fin-trade
+git push
+```
+
+If it does not pan out, abandon it. `git switch main` and the experiment stays
+out of everyone's way.
+
+### 2.3.4 When two people edit the same file
+
+Git merges different parts of a file automatically. When two people change the
+*same lines*, it stops and asks, marking the spot like this:
+
+```
+<<<<<<< HEAD
+    height_in: 7.50
+=======
+    height_in: 8.00
+>>>>>>> isabel/fin-trade
+```
+
+Above the `=======` is what was there; below is what is arriving. Delete the
+markers, leave the version you want (or write a third), then:
+
+```bash
+git add config/vehicle.yaml
+git commit
+```
+
+VS Code shows conflicts with "Accept Current / Accept Incoming / Accept Both"
+buttons, which is far easier than editing the markers by hand. A conflict is
+not an error — it is git refusing to guess which rocket you meant.
+
+### 2.3.5 Undoing things
+
+| Situation | Command |
+|---|---|
+| Discard changes to one file | `git restore config/vehicle.yaml` |
+| Unstage something added by mistake | `git restore --staged <file>` |
+| Fix the last commit's message | `git commit --amend` |
+| Set the work aside, temporarily | `git stash`, then `git stash pop` |
+| See what a file looked like before | `git log -p config/vehicle.yaml` |
+
+`git restore` throws work away permanently, so read `git status` first. Once
+something is committed it is recoverable; before that, it is not.
+
+### 2.3.6 What not to commit
+
+`.gitignore` already keeps out `.venv/`, `output/`, and the 80 MB OpenRocket
+jar. Everything in `output/` is reproducible from the configs and scripts, so
+committing figures adds weight and conflicts for nothing.
+
+Do commit your config changes — `vehicle.yaml`, `sites.yaml`,
+`uncertainty.yaml` are the team's shared record of the design, and the reason
+anyone can reproduce a number you quote in a review.
+
+Never commit a deliberate breakage. [`FRAMEWORK_TOUR.md`](FRAMEWORK_TOUR.md)
+has you break the framework on purpose; `git restore <file>` puts it back.
+
+### 2.3.7 The five commands you will actually use
+
+```bash
+git status      # what is going on
+git pull        # get everyone's work
+git add <file>  # choose what to save
+git commit -m "message"
+git push        # share it
+```
+
+Everything else can be looked up when you need it.
+
+## 2.4 Windows
 
 Open **PowerShell**, or **Git Bash** if you prefer it. Both work, and both are
 shown below wherever they differ. You do not need Administrator except where
@@ -321,7 +470,7 @@ This downloads roughly 200 MB and takes a few minutes.
 > `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then
 > `.venv\Scripts\Activate.ps1` — or in Git Bash,
 > `source .venv/Scripts/activate`. VS Code's terminal does this for you
-> ([§2.6](#26-visual-studio-code-recommended)).
+> ([§2.7](#27-visual-studio-code-recommended)).
 
 **Step 5 — Download the OpenRocket engine**
 
@@ -355,7 +504,7 @@ If either fails with `curl: (35) schannel: ... CRYPT_E_NO_REVOCATION_CHECK`,
 you are likely on a managed or corporate network; see
 [§3.4](#34-curl-35-schannel--crypt_e_no_revocation_check) for the fix.
 
-## 2.4 macOS
+## 2.5 macOS
 
 Open **Terminal**. These instructions use [Homebrew](https://brew.sh); install
 it first if you do not have it.
@@ -386,7 +535,7 @@ On Apple Silicon, if Java fails to start, confirm you installed the ARM build:
 `java -XshowSettings:properties -version 2>&1 | grep os.arch` should report
 `aarch64`.
 
-## 2.5 Linux
+## 2.6 Linux
 
 **Debian / Ubuntu:**
 
@@ -422,7 +571,7 @@ curl -L -o vendor/OpenRocket-24.12.jar \
   https://github.com/openrocket/openrocket/releases/download/release-24.12/OpenRocket-24.12.jar
 ```
 
-## 2.6 Visual Studio Code (recommended)
+## 2.7 Visual Studio Code (recommended)
 
 You can run everything from a plain terminal, but VS Code puts the file tree,
 the editor, and a terminal in one window — which matters on a laptop, where
@@ -483,14 +632,14 @@ not selected, or the terminal predates the selection — open a new one with the
 > passes no command-line arguments, though, so anything needing a flag (for
 > example `--ballast both`) is easier in the terminal.
 
-## 2.7 The OpenRocket GUI (optional)
+## 2.8 The OpenRocket GUI (optional)
 
 Download the installer for your platform from
 <https://openrocket.info/downloads.html>. **Use version 24.12** so the GUI
 matches the engine the framework drives — otherwise a file the framework writes
 may open with subtly different results.
 
-## 2.8 Verifying the installation
+## 2.9 Verifying the installation
 
 Run the built-in nominal analysis:
 
@@ -538,7 +687,7 @@ using the system Python instead of the venv. Use `.venv\Scripts\python`
 
 **In VS Code**, this means the interpreter is not the project's. Press
 Ctrl+Shift+P → `Python: Select Interpreter` → the entry containing `.venv`
-([§2.6](#26-visual-studio-code-recommended)), then open a *new* terminal with
+([§2.7](#27-visual-studio-code-recommended)), then open a *new* terminal with
 the `+` button; terminals opened earlier keep the old environment. Check which
 one you have with `python -c "import sys; print(sys.executable)"`.
 
@@ -561,7 +710,7 @@ still fails, either Java is not installed or it is somewhere unusual. Check:
 java -version
 ```
 
-If that fails, install a JDK (§2.3–2.5). If it works but the framework does not
+If that fails, install a JDK (§2.4–2.6). If it works but the framework does not
 see it, set `JAVA_HOME` explicitly:
 
 ```powershell
@@ -596,7 +745,7 @@ often leaves a small HTML error page:
 ls -l vendor/OpenRocket-24.12.jar                     # Git Bash, macOS, Linux
 ```
 
-Re-download with the command in §2.3–2.5. In PowerShell remember `curl.exe`,
+Re-download with the command in §2.4–2.6. In PowerShell remember `curl.exe`,
 not `curl`; in Git Bash plain `curl` is correct. A fresh clone has no `vendor/` folder at all, so create it first
 (`mkdir -p vendor`, or `New-Item -ItemType Directory -Force vendor` in
 PowerShell).
@@ -682,7 +831,7 @@ java -version            # Git Bash, macOS, Linux
 echo "$JAVA_HOME"
 ```
 
-**If `java -version` is under 17**, install a newer JDK (§2.3–2.5) and reopen
+**If `java -version` is under 17**, install a newer JDK (§2.4–2.6) and reopen
 the terminal.
 
 **If `java -version` says 17 but the error persists**, `JAVA_HOME` points at an
