@@ -12,6 +12,7 @@ which is the whole reason for pairing RocketPy with OpenRocket.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable
@@ -66,6 +67,25 @@ MAX_APOGEE_DELAY_S = 2.0
 MAX_KE_FTLBF = 75.0
 MAX_DRIFT_FT = 2500.0
 MAX_DESCENT_S = 100.0
+
+# Req 2.15: subscale shall use at least a class E (mid-power) motor.  Impulse
+# classes double: class n spans (1.25 * 2**(n-1), 1.25 * 2**n] N-s, so E ends at
+# 40 and begins just above 20.
+MIN_SUBSCALE_IMPULSE_NS = 20.0
+# Req 2.16: subscale shall not exceed 75% of full-scale length AND diameter.
+MAX_SUBSCALE_FRACTION = 0.75
+
+
+def impulse_class(total_impulse_ns: float) -> str:
+    """Motor letter class for an impulse in N-s ('J', 'L', ...).
+
+    Returns '-' below class A rather than raising: an unclassifiable impulse is
+    a data problem for the caller to report, not an exception mid-table.
+    """
+    if total_impulse_ns <= 1.25:
+        return "-"
+    n = math.ceil(math.log2(total_impulse_ns / 1.25))
+    return chr(ord("A") + n - 1) if 1 <= n <= 26 else "-"
 
 
 def check_apogee(apogee_ft: float) -> Check:
@@ -246,6 +266,74 @@ def check_mass_closure(vehicle: Vehicle, ballast_kg: float, propellant_kg: float
 # ---------------------------------------------------------------------------
 #  Full sweep
 # ---------------------------------------------------------------------------
+def check_subscale_motor(total_impulse_ns: float) -> Check:
+    """Req 2.15 - subscale shall use at least a class E (mid-power) motor."""
+    cls = impulse_class(total_impulse_ns)
+    ok = total_impulse_ns > MIN_SUBSCALE_IMPULSE_NS
+    return Check(
+        req="2.15", title="Subscale motor >= class E",
+        status=Status.PASS if ok else Status.FAIL,
+        value=total_impulse_ns, limit="> 20 N-s (class E)", units="N-s",
+        note=f"class {cls}",
+    )
+
+
+def check_subscale_scale(subscale: Vehicle, full: Vehicle | None) -> list[Check]:
+    """Req 2.16 - subscale shall not exceed 75% of full-scale length AND diameter.
+
+    Two checks rather than one: a subscale can satisfy the diameter limit and
+    breach the length limit, and a single combined verdict would hide which.
+    """
+    if full is None:
+        note = "set `scales_from:` to the full-scale vehicle file to verify"
+        return [Check(req="2.16", title="Subscale <= 75% of full-scale",
+                      status=Status.WARN, value=None,
+                      limit="<= 75%", units="", note=note)]
+
+    out = []
+    for label, sub_v, full_v, units in (
+        ("length", subscale.total_length_m, full.total_length_m, "%"),
+        ("diameter", subscale.diameter_m, full.diameter_m, "%"),
+    ):
+        frac = sub_v / full_v if full_v else float("inf")
+        out.append(Check(
+            req="2.16", title=f"Subscale {label} <= 75% of full-scale",
+            status=Status.PASS if frac <= MAX_SUBSCALE_FRACTION else Status.FAIL,
+            value=100.0 * frac, limit="<= 75%", units=units,
+            note=f"vs {full.name}",
+        ))
+    return out
+
+
+#  Requirements written against "the launch vehicle" govern the competition
+#  vehicle, so they do not apply to a subscale demonstration flight.  Req 3.1 is
+#  explicit -- "The full-scale launch vehicle shall stage the deployment..." --
+#  and 3.1.1/3.1.2 are its sub-items.
+#  FRR-V is deliberately absent: mass-budget closure is a self-consistency check
+#  on the vehicle file, not a handbook requirement, so it governs any vehicle.
+_FULL_SCALE_ONLY = {
+    "2.1", "2.3", "2.9", "2.12", "2.20.6", "2.20.7", "2.21",
+    "3.1.1", "3.1.2", "3.2", "3.10", "3.11",
+}
+#  Not required of a subscale by the handbook, but an RSO still cares and a
+#  student should still see the number, so these are reported and demoted to a
+#  warning rather than blanked out.
+_SUBSCALE_ADVISORY = {"2.11", "2.14"}
+
+
+def _for_subscale(check: Check) -> Check:
+    """Re-scope one full-scale check for a subscale flight."""
+    if check.req in _FULL_SCALE_ONLY:
+        return Check(req=check.req, title=check.title, status=Status.NA,
+                     value=check.value, limit=check.limit, units=check.units,
+                     note="full-scale requirement; not scored on subscale")
+    if check.req in _SUBSCALE_ADVISORY and check.status is Status.FAIL:
+        return Check(req=check.req, title=check.title, status=Status.WARN,
+                     value=check.value, limit=check.limit, units=check.units,
+                     note="advisory on subscale: not required, but the RSO will ask")
+    return check
+
+
 def check_all(result, vehicle: Vehicle, motor: dict[str, Any],
               ballast_kg: float = 0.0) -> list[Check]:
     """Run every implemented requirement against one simulation result.
@@ -281,6 +369,12 @@ def check_all(result, vehicle: Vehicle, motor: dict[str, Any],
             result.launch_mass_kg,
         ),
     ]
+
+    if vehicle.is_subscale:
+        checks = [_for_subscale(c) for c in checks]
+        checks.append(check_subscale_motor(motor["total_impulse_ns"]))
+        checks += check_subscale_scale(vehicle, vehicle.scale_reference())
+
     return checks
 
 
@@ -303,5 +397,9 @@ def format_table(checks: list[Check]) -> str:
             lines.append(f"          {'':8s} `-- {c.note}")
     s = summarize(checks)
     lines.append("-" * TABLE_WIDTH)
-    lines.append(f"  {s['PASS']} pass, {s['WARN']} warn, {s['FAIL']} FAIL")
+    tally = f"  {s['PASS']} pass, {s['WARN']} warn, {s['FAIL']} FAIL"
+    # Only shown when something was skipped, so the full-scale table is unchanged.
+    if s["N/A"]:
+        tally += f", {s['N/A']} N/A"
+    lines.append(tally)
     return "\n".join(lines)

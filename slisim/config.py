@@ -100,6 +100,25 @@ class Section:
         return U.kg_to_lb(self.mass_kg)
 
 
+VEHICLE_TYPES = ("full_scale", "subscale")
+
+
+def _vehicle_type(d: dict, path: Path) -> str:
+    """Which requirement set governs this vehicle.
+
+    Defaults to `full_scale`, so every existing vehicle file keeps being scored
+    against the full requirement set.  A subscale is opted in explicitly rather
+    than guessed from the filename: silently downgrading a full-scale vehicle to
+    the lenient set because someone renamed a file would hide real failures.
+    """
+    vt = str(d.get("vehicle_type", "full_scale")).lower()
+    if vt not in VEHICLE_TYPES:
+        raise ValueError(
+            f"{path.name}: vehicle_type {vt!r} is not one of {VEHICLE_TYPES}"
+        )
+    return vt
+
+
 @dataclass
 class Transition:
     """A change of body diameter: a boat tail, a shoulder, or a flare.
@@ -136,6 +155,8 @@ class Vehicle:
     team: str
     season: str
     status: str
+    vehicle_type: str          # full_scale | subscale
+    scales_from: str | None    # subscale only: the full-scale it represents
     target_apogee_m: float
 
     outer_radius_m: float
@@ -243,6 +264,8 @@ class Vehicle:
             team=d.get("team", ""),
             season=d.get("season", ""),
             status=d.get("status", ""),
+            vehicle_type=_vehicle_type(d, path),
+            scales_from=d.get("scales_from"),
             target_apogee_m=U.ft_to_m(float(d.get("target_apogee_ft", 5000.0))),
             outer_radius_m=U.in_to_m(af["outer_diameter_in"]) / 2.0,
             wall_thickness_m=U.in_to_m(af["wall_thickness_in"]),
@@ -327,6 +350,30 @@ class Vehicle:
     def slug(self) -> str:
         """Filesystem-safe form of `name`, for this vehicle's output directory."""
         return slug(self.name)
+
+    @property
+    def is_subscale(self) -> bool:
+        return self.vehicle_type == "subscale"
+
+    def scale_reference(self) -> "Vehicle | None":
+        """The full-scale vehicle this subscale represents, for req 2.16.
+
+        `scales_from` is a filename in config/vehicles/ (or a path).  Returns
+        None when unset, which the 2.16 check reports as unverifiable rather
+        than passing -- a check that quietly passes when it cannot run is worse
+        than no check.
+        """
+        if not self.scales_from:
+            return None
+        p = Path(self.scales_from)
+        if not p.is_absolute() and not p.exists():
+            p = VEHICLE_DIR / p
+        if not p.is_file():
+            raise FileNotFoundError(
+                f"{self.name}: scales_from {self.scales_from!r} not found "
+                f"(looked in {VEHICLE_DIR})"
+            )
+        return Vehicle.from_yaml(p)
 
     def recovery_mass_kg(self) -> float:
         return self.drogue["mass_kg"] + self.main["mass_kg"] + self.shock_cord_mass_kg
