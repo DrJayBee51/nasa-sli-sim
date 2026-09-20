@@ -101,6 +101,34 @@ class Section:
 
 
 @dataclass
+class Transition:
+    """A change of body diameter: a boat tail, a shoulder, or a flare.
+
+    `after_section` names the section this follows, so the transition travels
+    with its neighbour if sections are reordered.  Omit it and the transition
+    goes at the aft end, which is where a boat tail lives.
+    """
+
+    name: str
+    after_section: str | None
+    fore_radius_m: float
+    aft_radius_m: float
+    length_m: float
+    shape: str
+    shape_parameter: float
+    wall_thickness_m: float
+    mass_kg: float
+
+    @property
+    def length_in(self) -> float:
+        return U.m_to_in(self.length_m)
+
+    @property
+    def mass_lb(self) -> float:
+        return U.kg_to_lb(self.mass_kg)
+
+
+@dataclass
 class Vehicle:
     raw: dict
 
@@ -122,6 +150,7 @@ class Vehicle:
     nose_mass_kg: float
 
     sections: list[Section]
+    transitions: list[Transition]
 
     fin_count: int
     fin_root_chord_m: float
@@ -171,6 +200,28 @@ class Vehicle:
             for s in d["sections"]
         ]
 
+        section_names = {s.name for s in sections}
+        transitions = []
+        for t in d.get("transitions") or []:
+            after = t.get("after_section")
+            if after is not None and after not in section_names:
+                raise ValueError(
+                    f"transition {t.get('name', '?')!r} names after_section "
+                    f"{after!r}, which is not a section; have {sorted(section_names)}"
+                )
+            transitions.append(Transition(
+                name=t.get("name", "Transition"),
+                after_section=after,
+                fore_radius_m=U.in_to_m(t["fore_diameter_in"]) / 2.0,
+                aft_radius_m=U.in_to_m(t["aft_diameter_in"]) / 2.0,
+                length_m=U.in_to_m(t["length_in"]),
+                shape=t.get("shape", "conical"),
+                shape_parameter=float(t.get("shape_parameter", 1.0)),
+                wall_thickness_m=U.in_to_m(
+                    t.get("wall_thickness_in", af["wall_thickness_in"])),
+                mass_kg=U.lb_to_kg(float(t.get("mass_lb", 0.0))),
+            ))
+
         def chute(key: str) -> dict:
             c = rc[key]
             dia = U.in_to_m(c["diameter_in"])
@@ -203,6 +254,7 @@ class Vehicle:
             nose_shoulder_length_m=U.in_to_m(nc.get("shoulder_length_in", 0.0)),
             nose_mass_kg=U.lb_to_kg(nc["mass_lb"]),
             sections=sections,
+            transitions=transitions,
             fin_count=int(fn["count"]),
             fin_root_chord_m=U.in_to_m(fn["root_chord_in"]),
             fin_tip_chord_m=U.in_to_m(fn["tip_chord_in"]),
@@ -242,8 +294,20 @@ class Vehicle:
         return sum(s.length_m for s in self.sections)
 
     @property
-    def total_length_m(self) -> float:
+    def body_end_m(self) -> float:
+        """Station of the aft end of the last body tube, from the nose tip.
+
+        This -- not `total_length_m` -- is what the motor, fins and rail buttons
+        are positioned against.  A boat tail lengthens the vehicle but does not
+        move the fin can, so referencing overall length would push all three aft
+        by the length of the transition.
+        """
         return self.nose_length_m + self.body_length_m
+
+    @property
+    def total_length_m(self) -> float:
+        """Overall length including transitions -- what a reviewer measures."""
+        return self.body_end_m + sum(t.length_m for t in self.transitions)
 
     # --- mass bookkeeping ---------------------------------------------
     #  Deliberately explicit.  The FRR requires that
@@ -254,6 +318,7 @@ class Vehicle:
         return (
             self.nose_mass_kg
             + sum(s.mass_kg for s in self.sections)
+            + sum(t.mass_kg for t in self.transitions)
             + self.fin_mass_kg
             + ballast_kg
         )
@@ -283,6 +348,8 @@ class Vehicle:
         by_member = {"nose_cone": self.nose_mass_kg, "fins": self.fin_mass_kg}
         for s in self.sections:
             by_member[s.name] = s.mass_kg
+        for t in self.transitions:
+            by_member[t.name] = t.mass_kg
         if ballast_kg:
             loc = self.ballast_location
             by_member[loc] = by_member.get(loc, 0.0) + ballast_kg
@@ -295,7 +362,9 @@ class Vehicle:
     def unassigned_members(self) -> list[str]:
         """Named masses not claimed by any landing section (a spec bug)."""
         claimed = {m for ls in self.landing_sections for m in ls["members"]}
-        known = {"nose_cone", "fins"} | {s.name for s in self.sections}
+        known = ({"nose_cone", "fins"}
+                 | {s.name for s in self.sections}
+                 | {t.name for t in self.transitions})
         return sorted(known - claimed)
 
 

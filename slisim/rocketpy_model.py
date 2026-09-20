@@ -308,7 +308,10 @@ def build_rocket(vehicle: Vehicle, or_motor, mass_props: dict[str, float],
         coordinate_system_orientation="nose_to_tail",
     )
 
-    total_len = vehicle.total_length_m
+    # Aft end of the last body tube, NOT overall length: a boat tail lengthens
+    # the vehicle without moving the fin can or the motor.  With no transitions
+    # the two are identical, so existing vehicles are unaffected.
+    total_len = vehicle.body_end_m
     motor_len = float(or_motor.getLength())
     # Motor center of mass sits just forward of the aft end, allowing overhang.
     rocket.add_motor(
@@ -337,6 +340,21 @@ def build_rocket(vehicle: Vehicle, or_motor, mass_props: dict[str, float],
         upper_button_position=total_len - vehicle.fin_root_chord_m - 0.30,
         lower_button_position=total_len - vehicle.fin_root_chord_m,
     )
+
+    # --- transitions.  RocketPy calls any diameter change a "tail" whether it
+    #  narrows or flares; `position` is the station of its forward face.
+    station = vehicle.nose_length_m
+    ends = {}
+    for sec in vehicle.sections:
+        station += sec.length_m
+        ends[sec.name] = station
+    for tr in vehicle.transitions:
+        rocket.add_tail(
+            top_radius=tr.fore_radius_m,
+            bottom_radius=tr.aft_radius_m,
+            length=tr.length_m,
+            position=ends.get(tr.after_section, vehicle.body_end_m),
+        )
 
     # --- recovery.  cd_s is Cd * reference area, RocketPy's parameterisation.
     drogue = vehicle.drogue

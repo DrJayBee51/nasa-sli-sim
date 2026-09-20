@@ -386,6 +386,31 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
         raise ValueError("vehicle.yaml defines no body sections")
     booster = list(tubes.values())[-1]
 
+    # --- transitions (boat tails, flares, diameter steps)
+    #  Inserted by child index rather than appended, so a transition declared
+    #  mid-body lands between the right two tubes.  getChildPosition is
+    #  re-queried each time because an earlier insert shifts later indices.
+    for tr in vehicle.transitions:
+        trans = RC.Transition()
+        trans.setName(tr.name)
+        trans.setShapeType(getattr(Shape, _SHAPES[tr.shape.lower()]))
+        trans.setShapeParameter(tr.shape_parameter)
+        trans.setLength(tr.length_m)
+        trans.setForeRadius(tr.fore_radius_m)
+        trans.setAftRadius(tr.aft_radius_m)
+        trans.setThickness(tr.wall_thickness_m)
+        trans.setFinish(finish)
+        trans.setOverrideMass(tr.mass_kg)
+        trans.setMassOverridden(True)
+        if tr.after_section is None:
+            stage.addChild(trans)
+        else:
+            index = stage.getChildPosition(tubes[tr.after_section]) + 1
+            # JInt is required: OpenRocket overloads addChild on (component, int)
+            # and (component, boolean), and JPype cannot pick between them from a
+            # Python int alone.
+            stage.addChild(trans, jpype.JInt(index))
+
     # --- fins on the aft-most tube
     fins = RC.TrapezoidFinSet()
     fins.setName("Fin Set")
