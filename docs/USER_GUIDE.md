@@ -462,6 +462,115 @@ target_apogee_ft: 4500.0
 Always validate with `--ballast both`. Requirement 2.20.7.4 requires compliance
 at both extremes, and the extremes differ by hundreds of feet.
 
+## 2.8 From an OpenRocket design to a vehicle file
+
+You will not author a vehicle file from nothing. You will draw the rocket in the
+OpenRocket GUI first — that is where fin shapes and component fits get worked
+out — and then transcribe it. The framework runs the other direction
+(`vehicle.yaml` generates the `.ork`), so this is the one step it cannot do for
+you, and it is where the mistakes happen: a transposed digit produces a
+plausible number, not an error.
+
+Work through the blocks in the order below. Every value comes from a component
+in the OpenRocket tree, so keep the GUI open beside the file.
+
+| yaml block | OpenRocket source |
+|---|---|
+| `airframe` | any body tube: outer diameter, wall thickness, finish |
+| `nose_cone` | the nose cone: shape, length, shoulder length, wall thickness |
+| `sections` | each body tube, nose-to-tail: length and mass |
+| `transitions` | each transition: fore/aft diameter, length, shape |
+| `fins` | the fin set: chords, sweep, span, thickness, cant |
+| `motor` | the motor mount inner tube: inner diameter, length |
+| `recovery` | each parachute: diameter, Cd, deploy event and altitude |
+| `landing_sections` | **not in the .ork** — which joints separate in flight |
+
+### The mass rule, which is where transcription goes wrong
+
+OpenRocket shows you two numbers for a component: its **own** mass, and its mass
+**with everything inside it**. The yaml wants neither, quite.
+
+> A section's `mass_lb` is that section plus everything permanently inside it,
+> **excluding** the fins, the parachutes, the shock cord, and the motor — because
+> those are declared in their own blocks.
+
+Take the rolled total and you count the fins and parachutes twice. That mistake
+is worth **0.22 lb on the subscale**, and it is invisible: every number still
+looks reasonable, the file still loads, the simulation still runs. Only the mass
+budget moves.
+
+Concretely, for a booster tube containing a motor mount, two centering rings, a
+bulkhead, the main parachute, shock cord, and the fin set:
+
+```
+OpenRocket "with contents"  1.308 lb     <- do NOT use
+  less fin set              0.180        declared in `fins:`
+  less main parachute       0.018        declared in `recovery:`
+  less shock cord           0.002        declared in `shock_cord_mass_lb:`
+                            -----
+section mass_lb             1.108 lb     <- use this
+```
+
+Everything else inside — the mount, the rings, the bulkhead — stays in, because
+it is permanently part of that section and it is what lands.
+
+### Check the transcription against the source
+
+Do not eyeball it. Build both models and compare:
+
+```bash
+python scripts/check_against_ork.py \
+    --vehicle config/vehicles/design_a.yaml \
+    --ork ../2026_2027/Vehicle_Design_A.ork
+```
+
+It reports overall length, launch mass, CP and CG side by side, and exits
+non-zero when anything is outside tolerance. Read the deltas rather than looking
+for a pass, because each one points somewhere different:
+
+| What is off | What it means |
+|---|---|
+| **length** or **mass** | A block was mistyped, or the mass rule above was missed. |
+| **CP** | Geometry: a chord, a span, a nose length — or a transition you forgot to declare. |
+| **CG**, with mass and CP correct | Usually not an error. See below. |
+
+It also warns when the `.ork` and the yaml disagree on how many fin sets exist,
+which is worth having: a fin set duplicated in the GUI sits invisibly on top of
+the original and inflates CP, margin and mass all at once.
+
+### What the schema deliberately cannot represent
+
+Three limits worth knowing before you fight the file:
+
+**Mass distribution within a section.** A section has a length and a mass but no
+internal layout, so the framework places that mass at the section's midpoint.
+OpenRocket puts each component at its real station. For most vehicles the
+difference is negligible — a subscale transcribed correctly matches its `.ork`
+CG to 0.00 in. It stops being negligible when a section carries a heavy
+concentrated mass: a full-scale with an 8 lb payload bay came out **1.15 in
+forward, reading 2.43 caliber against a true 2.20**. The error is optimistic, so
+if you are near the 2.0 limit of requirement 2.11, trust the `.ork`.
+
+**One surface finish per airframe.** If the GUI has polished forward tubes and
+painted aft ones, pick the rougher. Being conservative on drag is the right way
+to be wrong.
+
+**One fin set.** Canards or strakes cannot be expressed. Nothing in the USLI
+ruleset needs them, and OpenRocket cannot compute a 2-fin set anyway — Barrowman
+assumes an axisymmetric set and returns zero normal force otherwise.
+
+### Things the .ork simply does not know
+
+Two blocks have no source in the GUI and are engineering decisions you supply:
+
+- **`landing_sections`** — which joints separate in flight, and therefore what
+  lands as one piece. This drives the kinetic-energy check of requirement 3.2,
+  which is scored. Guessing it wrong produces a confidently wrong answer.
+- **`target_apogee_ft`** — declared at CDR under requirement 2.3.
+
+Mark anything you assume. A `# CONFIRM` comment costs nothing and stops an
+assumption being read as data three months later.
+
 ---
 
 # Part 3 — Launch sites
@@ -1061,6 +1170,18 @@ No flags. Flies 20 cases and asserts `plot_inputs.py` regenerates their inputs
 bit-for-bit. Run it after changing `draw_sample`, `run_montecarlo`'s sampling
 loop, or `plot_inputs.py`'s copy of it — those three staying in step is what
 makes the figure trustworthy. Exits non-zero if they diverge.
+
+### `check_against_ork.py`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--vehicle PATH` | required | The vehicle yaml to check |
+| `--ork PATH` | required | The OpenRocket file it was transcribed from |
+| `--ballast {min,max}` | `min` | Ballast configuration |
+| `--mach X` | 0.3 | Evaluation Mach, matching the GUI convention |
+
+Compares overall length, launch mass, CP and CG. Exit code 0 if every delta is
+inside tolerance, 1 otherwise. See [§2.8](#28-from-an-openrocket-design-to-a-vehicle-file).
 
 ### `fit_cd.py`
 
