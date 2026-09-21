@@ -1,7 +1,7 @@
 """Compare a vehicle file against the OpenRocket design it was transcribed from.
 
-    python scripts/check_against_ork.py --vehicle config/vehicles/design_a.yaml \
-                                        --ork ../2026_2027/Vehicle_Design_A.ork
+    python scripts/check_against_ork.py --vehicle config/vehicles/full_scale.yaml \
+                                        --ork path/to/your_design.ork
 
 Teams design in the OpenRocket GUI and then transcribe into a vehicle file.
 Transcription is where digits get transposed and blocks get forgotten, and the

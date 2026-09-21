@@ -520,8 +520,8 @@ Do not eyeball it. Build both models and compare:
 
 ```bash
 python scripts/check_against_ork.py \
-    --vehicle config/vehicles/design_a.yaml \
-    --ork ../2026_2027/Vehicle_Design_A.ork
+    --vehicle config/vehicles/full_scale.yaml \
+    --ork path/to/your_design.ork
 ```
 
 It reports overall length, launch mass, CP and CG side by side, and exits
