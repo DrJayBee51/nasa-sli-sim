@@ -714,8 +714,18 @@ python scripts/run_montecarlo.py -n 1000 --seed 999
 | 1,000–2,000 | Report-quality; stable to ~1% on the 5th/95th percentiles |
 | 5,000+ | Only if you care about the far tails |
 
-**Reproducibility.** The same `--seed` gives byte-identical results months
+**Reproducibility.** The same `--seed` reproduces the same campaign months
 later. Record the seed alongside any number you publish.
+
+One honest caveat, because a reviewer may notice it. OpenRocket's own output is
+not bit-identical between runs: summation order inside the JVM varies, which
+moves its numbers by about one part in 10¹². You will see it as the last printed
+digit of an OpenRocket result changing — apogee by ~0.01 ft — and never as a
+changed pass/fail or a shifted statistic. The RocketPy side *is* bit-identical,
+because the drag curve it is handed is quantised before it gets there; without
+that, the solver amplifies OpenRocket's last-bit jitter to about 1e-5 by
+landing. Quote results to the precision they deserve — four significant figures
+is generous for an apogee prediction — and this never arises.
 
 **The two engines disperse different things.** RocketPy disperses everything —
 mass, CG, drag, motor, wind, rail. OpenRocket disperses launch conditions only,

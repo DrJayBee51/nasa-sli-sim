@@ -81,7 +81,14 @@ def export_drag_curves(or_result) -> tuple[np.ndarray, np.ndarray]:
         m, c = m[order], c[order]
         # Collapse duplicate Mach values; RocketPy interpolates and dislikes ties.
         m_u, idx = np.unique(np.round(m, 4), return_index=True)
-        c_u = np.asarray([c[order_i] for order_i in idx])
+        # Quantise Cd for the same reason the Mach axis is rounded above, but
+        # for reproducibility rather than for ties.  OpenRocket's output is not
+        # bit-identical between runs -- summation order inside the JVM varies,
+        # so Cd moves by ~5e-13 -- and RocketPy's adaptive solver amplifies that
+        # to ~1e-5 in drift by the time the vehicle lands.  Six decimals is nine
+        # orders of magnitude finer than a drag coefficient means anything, and
+        # it makes the curve, and therefore the whole RocketPy result, repeat.
+        c_u = np.round(np.asarray([c[order_i] for order_i in idx]), 6)
         # Anchor at Mach 0 so RocketPy never extrapolates below the data.
         if m_u[0] > 0.0:
             m_u = np.insert(m_u, 0, 0.0)
