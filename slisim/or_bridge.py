@@ -314,6 +314,21 @@ def motor_summary(motor) -> dict[str, float | str]:
 # ---------------------------------------------------------------------------
 #  Build a Rocket from the YAML spec
 # ---------------------------------------------------------------------------
+def _override_cg(component, cg_from_front_m: float | None) -> None:
+    """Pin a component's CG, when the vehicle file says where its mass sits.
+
+    Left alone, OpenRocket derives CG from the component's own geometry, which
+    assumes the declared mass is spread like the shell is.  That is a good
+    assumption for a bare tube and a poor one for a section carrying a payload
+    at one end or a coupler at the other.  A section with no `cg_from_front_in`
+    keeps the geometric CG, so existing vehicle files are unaffected.
+    """
+    if cg_from_front_m is None:
+        return
+    component.setOverrideCGX(cg_from_front_m)
+    component.setCGOverridden(True)
+
+
 _SHAPES = {
     "conical": "CONICAL", "ogive": "OGIVE", "ellipsoid": "ELLIPSOID",
     "power": "POWER", "parabolic": "PARABOLIC", "haack": "HAACK",
@@ -365,6 +380,7 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
     nose.setFinish(finish)
     nose.setOverrideMass(vehicle.nose_mass_kg)
     nose.setMassOverridden(True)
+    _override_cg(nose, vehicle.nose_cg_from_tip_m)
     stage.addChild(nose)
 
     # --- body sections
@@ -379,6 +395,7 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
         mass = sec.mass_kg + (ballast_kg if sec.name == vehicle.ballast_location else 0.0)
         tube.setOverrideMass(mass)
         tube.setMassOverridden(True)
+        _override_cg(tube, sec.cg_from_front_m)
         stage.addChild(tube)
         tubes[sec.name] = tube
 
@@ -459,6 +476,17 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
     #  Drogue rides in the section forward of the av-bay; main forward of that.
     #  Exact bay assignment barely moves the trajectory but does move the CG,
     #  so it is modeled rather than lumped.
+    def bay_for(spec_bay: str | None, default):
+        """The tube a recovery item rides in, by name, else the conventional one."""
+        if spec_bay is None:
+            return default
+        if spec_bay not in tubes:
+            raise ValueError(
+                f"recovery bay {spec_bay!r} is not a section; "
+                f"have {sorted(tubes)}"
+            )
+        return tubes[spec_bay]
+
     def add_chute(spec: dict, parent, offset_frac: float):
         chute = RC.Parachute()
         chute.setName(spec["name"])
@@ -470,7 +498,9 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
         chute.setOverrideMass(spec["mass_kg"])
         chute.setMassOverridden(True)
         chute.setAxialMethod(AxialMethod.TOP)
-        chute.setAxialOffset(parent.getLength() * offset_frac)
+        cg = spec.get("cg_from_front_m")
+        chute.setAxialOffset(cg if cg is not None
+                             else parent.getLength() * offset_frac)
         cfg = chute.getDeploymentConfigurations().getDefault()
         if spec["deploy_event"] == "altitude":
             cfg.setDeployEvent(DeployEvent.ALTITUDE)
@@ -481,8 +511,10 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
         parent.addChild(chute)
         return chute
 
-    add_chute(vehicle.main, list(tubes.values())[0], 0.55)
-    add_chute(vehicle.drogue, booster, 0.10)
+    add_chute(vehicle.main,
+              bay_for(vehicle.main.get("bay"), list(tubes.values())[0]), 0.55)
+    add_chute(vehicle.drogue,
+              bay_for(vehicle.drogue.get("bay"), booster), 0.10)
 
     # --- shock cord, lumped at the av-bay
     if vehicle.shock_cord_mass_kg > 0:
@@ -491,10 +523,15 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
         cord.setComponentMass(vehicle.shock_cord_mass_kg)
         cord.setLength(vehicle.outer_radius_m)
         cord.setRadius(vehicle.outer_radius_m * 0.7)
-        cord.setAxialMethod(AxialMethod.MIDDLE)
-        cord.setAxialOffset(0.0)
-        mid = list(tubes.values())[len(tubes) // 2]
-        mid.addChild(cord)
+        parent = bay_for(vehicle.shock_cord_bay,
+                         list(tubes.values())[len(tubes) // 2])
+        if vehicle.shock_cord_cg_from_front_m is None:
+            cord.setAxialMethod(AxialMethod.MIDDLE)
+            cord.setAxialOffset(0.0)
+        else:
+            cord.setAxialMethod(AxialMethod.TOP)
+            cord.setAxialOffset(vehicle.shock_cord_cg_from_front_m)
+        parent.addChild(cord)
 
     # --- flight configuration + motor
     #  A named FlightConfigurationId must exist before a motor can be bound to

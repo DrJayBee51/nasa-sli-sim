@@ -16,10 +16,10 @@ Read the deltas, do not just look for OK:
   CP off               geometry: a chord, a span, a nose length, or a missing
                        transition
   CG off but mass and CP right
-                       usually not an error.  The schema gives a section a mass
-                       but no mass distribution, so section mass sits at the
-                       midpoint while the .ork places components at stations.
-                       See USER_GUIDE section 2.8.
+                       the mass is right but in the wrong place.  By default a
+                       section's mass sits at its midpoint and the main rides
+                       forward; declare cg_from_front_in and the recovery bays
+                       to say otherwise.  See USER_GUIDE section 2.8.
 
 Exit code is 0 when every delta is inside tolerance, 1 otherwise, so this is
 usable in CI once a design is frozen.

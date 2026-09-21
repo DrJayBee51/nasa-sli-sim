@@ -538,18 +538,59 @@ It also warns when the `.ork` and the yaml disagree on how many fin sets exist,
 which is worth having: a fin set duplicated in the GUI sits invisibly on top of
 the original and inflates CP, margin and mass all at once.
 
+### When CG does not match but mass and CP do
+
+Length, mass and CP come straight from numbers you typed. CG does not — it
+depends on *where* that mass sits, and by default the framework makes two
+assumptions:
+
+- a section's mass is spread evenly, putting its CG at the midpoint;
+- the main rides in the forward-most section and the drogue in the booster.
+
+Both are conventional and both are often wrong. A section carrying a payload at
+one end, or a design that packs the main aft, will come out with the right mass
+in the wrong place. On one full-scale the two together put CG **1.15 in forward,
+reading 2.43 caliber against a true 2.20** — optimistic, on a scored
+requirement, near the 2.0 limit of requirement 2.11.
+
+Say where the mass is and the assumption goes away:
+
+```yaml
+nose_cone:
+  mass_lb: 0.766
+  cg_from_tip_in: 10.84       # the shell plus its bulkhead, not the midpoint
+
+sections:
+  - name: "Payload Bay"
+    length_in: 20.00
+    mass_lb: 10.671
+    cg_from_front_in: 10.24   # measured from the front of THIS section
+
+recovery:
+  main:
+    mass_lb: 1.085
+    bay: "Booster"            # which section it is packed in
+    cg_from_front_in: 2.00
+  shock_cord_mass_lb: 0.990
+  shock_cord_bay: "Drogue Bay"
+  shock_cord_cg_from_front_in: 6.10
+```
+
+Every one of these is optional, and leaving them out keeps the old behaviour, so
+adding them to an existing file changes nothing until you fill them in. Applied
+to the full-scale above, they brought CG to within **0.03 in** and margin to
+within **0.01 caliber** of the source design.
+
+Read the values off the OpenRocket component analysis. Do not compute them by
+hand — you will be transcribing a number you already have.
+
+Shock cord is lumped into one bay rather than strung between sections, so if
+yours is split across several, give the combined mass and the station where the
+combination balances.
+
 ### What the schema deliberately cannot represent
 
 Three limits worth knowing before you fight the file:
-
-**Mass distribution within a section.** A section has a length and a mass but no
-internal layout, so the framework places that mass at the section's midpoint.
-OpenRocket puts each component at its real station. For most vehicles the
-difference is negligible — a subscale transcribed correctly matches its `.ork`
-CG to 0.00 in. It stops being negligible when a section carries a heavy
-concentrated mass: a full-scale with an 8 lb payload bay came out **1.15 in
-forward, reading 2.43 caliber against a true 2.20**. The error is optimistic, so
-if you are near the 2.0 limit of requirement 2.11, trust the `.ork`.
 
 **One surface finish per airframe.** If the GUI has polished forward tubes and
 painted aft ones, pick the rougher. Being conservative on drag is the right way

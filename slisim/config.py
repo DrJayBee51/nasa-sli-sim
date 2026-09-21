@@ -90,6 +90,11 @@ class Section:
     name: str
     length_m: float
     mass_kg: float
+    # Where that mass sits, from the front of the section.  None means "assume
+    # it is spread evenly", which puts the CG at the midpoint -- fine until a
+    # section carries something heavy and off-centre, such as a payload or a
+    # coupler at one end.
+    cg_from_front_m: float | None = None
 
     @property
     def length_in(self) -> float:
@@ -169,6 +174,7 @@ class Vehicle:
     nose_thickness_m: float
     nose_shoulder_length_m: float
     nose_mass_kg: float
+    nose_cg_from_tip_m: float | None
 
     sections: list[Section]
     transitions: list[Transition]
@@ -195,6 +201,8 @@ class Vehicle:
     drogue: dict
     main: dict
     shock_cord_mass_kg: float
+    shock_cord_bay: str | None
+    shock_cord_cg_from_front_m: float | None
 
     landing_sections: list[dict]
 
@@ -212,11 +220,15 @@ class Vehicle:
         mo, rc = d["motor"], d["recovery"]
         ba = d.get("ballast") or {}
 
+        def opt_in_to_m(v) -> float | None:
+            return None if v is None else U.in_to_m(float(v))
+
         sections = [
             Section(
                 name=s["name"],
                 length_m=U.in_to_m(s["length_in"]),
                 mass_kg=U.lb_to_kg(s["mass_lb"]),
+                cg_from_front_m=opt_in_to_m(s.get("cg_from_front_in")),
             )
             for s in d["sections"]
         ]
@@ -256,6 +268,13 @@ class Vehicle:
                 "deploy_delay_s": float(c.get("deploy_delay_s", 0.0)),
                 "deploy_altitude_m": U.ft_to_m(float(alt_ft)) if alt_ft is not None else 0.0,
                 "mass_kg": U.lb_to_kg(float(c.get("mass_lb", 0.0))),
+                # Which section it rides in, and where.  Unset means "use the
+                # conventional bay", which is what every vehicle file did before
+                # these keys existed.  A main packed aft instead of forward is
+                # worth about an inch of CG on a 26 lb vehicle, so it is worth
+                # stating rather than assuming.
+                "bay": c.get("bay"),
+                "cg_from_front_m": opt_in_to_m(c.get("cg_from_front_in")),
             }
 
         return cls(
@@ -276,6 +295,7 @@ class Vehicle:
             nose_thickness_m=U.in_to_m(nc["wall_thickness_in"]),
             nose_shoulder_length_m=U.in_to_m(nc.get("shoulder_length_in", 0.0)),
             nose_mass_kg=U.lb_to_kg(nc["mass_lb"]),
+            nose_cg_from_tip_m=opt_in_to_m(nc.get("cg_from_tip_in")),
             sections=sections,
             transitions=transitions,
             fin_count=int(fn["count"]),
@@ -297,6 +317,8 @@ class Vehicle:
             drogue=chute("drogue"),
             main=chute("main"),
             shock_cord_mass_kg=U.lb_to_kg(float(rc.get("shock_cord_mass_lb", 0.0))),
+            shock_cord_bay=rc.get("shock_cord_bay"),
+            shock_cord_cg_from_front_m=opt_in_to_m(rc.get("shock_cord_cg_from_front_in")),
             landing_sections=d.get("landing_sections", []),
             ballast_min_kg=U.lb_to_kg(float(ba.get("min_lb", 0.0))),
             ballast_max_kg=U.lb_to_kg(float(ba.get("max_lb", 0.0))),
