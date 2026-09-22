@@ -385,7 +385,31 @@ Fins are the main lever on static stability. On the template, going from
 difference between failing and passing requirement 2.11 — at a cost of about 45
 ft of apogee.
 
-## 2.4 Motor
+## 2.4 Transitions
+
+A transition is a change of body diameter — a boat tail, a shoulder, or a
+flare. Skip this section entirely if your vehicle is a constant-diameter tube
+nose-to-tail; `transitions:` defaults to empty.
+
+```yaml
+transitions:
+  - name: "Boattail"
+    after_section: "Booster"   # optional; omit it and the transition sits at the aft end
+    fore_diameter_in: 5.15
+    aft_diameter_in: 2.95
+    length_in: 2.50
+    shape: ogive                # conical | ogive | ellipsoid | haack | parabolic | power
+    shape_parameter: 1.0
+    wall_thickness_in: 0.079
+    mass_lb: 0.137
+```
+
+> **`transitions` is a list, even with a single entry.** Leave off the
+> leading `-` and `name: "Boattail"` becomes its own list item read as plain
+> text, not part of a mapping — the framework then rejects it with a clear
+> error naming the bad entry, rather than silently dropping the transition.
+
+## 2.5 Motor
 
 ```yaml
 motor:
@@ -407,7 +431,7 @@ OpenRocket jar — no network access and no per-machine motor files. Use
 > at burnout, adds a `Tumbling` phase, and silently invalidates your entire
 > descent analysis.
 
-## 2.5 Recovery
+## 2.6 Recovery
 
 ```yaml
 recovery:
@@ -430,7 +454,7 @@ recovery:
 of the least certain numbers in the whole model, which is why
 `uncertainty.yaml` disperses it by 10%.
 
-## 2.6 Landing sections
+## 2.7 Landing sections
 
 ```yaml
 landing_sections:
@@ -448,7 +472,7 @@ These must **partition** the vehicle — every mass assigned exactly once. The
 framework reports anything left unassigned, and the `FRR-V` check will fail if
 the arithmetic does not close.
 
-## 2.7 Ballast and target
+## 2.8 Ballast and target
 
 ```yaml
 ballast:
@@ -462,7 +486,7 @@ target_apogee_ft: 4500.0
 Always validate with `--ballast both`. Requirement 2.20.7.4 requires compliance
 at both extremes, and the extremes differ by hundreds of feet.
 
-## 2.8 From an OpenRocket design to a vehicle file
+## 2.9 From an OpenRocket design to a vehicle file
 
 You will not author a vehicle file from nothing. You will draw the rocket in the
 OpenRocket GUI first — that is where fin shapes and component fits get worked
@@ -479,7 +503,7 @@ in the OpenRocket tree, so keep the GUI open beside the file.
 | `airframe` | any body tube: outer diameter, wall thickness, finish |
 | `nose_cone` | the nose cone: shape, length, shoulder length, wall thickness |
 | `sections` | each body tube, nose-to-tail: length and mass |
-| `transitions` | each transition: fore/aft diameter, length, shape |
+| `transitions` | each transition: name, after_section, fore/aft diameter, length, shape |
 | `fins` | the fin set: chords, sweep, span, thickness, cant |
 | `motor` | the motor mount inner tube: inner diameter, length |
 | `recovery` | each parachute: diameter, Cd, deploy event and altitude |
@@ -1232,7 +1256,7 @@ makes the figure trustworthy. Exits non-zero if they diverge.
 | `--mach X` | 0.3 | Evaluation Mach, matching the GUI convention |
 
 Compares overall length, launch mass, CP and CG. Exit code 0 if every delta is
-inside tolerance, 1 otherwise. See [§2.8](#28-from-an-openrocket-design-to-a-vehicle-file).
+inside tolerance, 1 otherwise. See [§2.9](#29-from-an-openrocket-design-to-a-vehicle-file).
 
 ### `fit_cd.py`
 

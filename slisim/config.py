@@ -124,6 +124,23 @@ def _vehicle_type(d: dict, path: Path) -> str:
     return vt
 
 
+def _as_mapping(item: Any, index: int, block: str, path: Path) -> dict:
+    """One entry of a list-of-mappings yaml block.
+
+    A bare scalar here is almost always a missing '-' before a key, which
+    turns `key: value` into a plain string list instead of one mapping.
+    Catching it here names the problem, instead of an AttributeError/TypeError
+    raised deep inside whatever `.get()`/`[...]` happens to run first.
+    """
+    if not isinstance(item, dict):
+        raise ValueError(
+            f"{path.name}: {block}[{index}] must be a mapping, got {item!r} "
+            f"-- check for a missing '-' before a key, which turns the whole "
+            f"block into something else"
+        )
+    return item
+
+
 @dataclass
 class Transition:
     """A change of body diameter: a boat tail, a shoulder, or a flare.
@@ -230,12 +247,14 @@ class Vehicle:
                 mass_kg=U.lb_to_kg(s["mass_lb"]),
                 cg_from_front_m=opt_in_to_m(s.get("cg_from_front_in")),
             )
-            for s in d["sections"]
+            for s in (_as_mapping(s, i, "sections", path)
+                      for i, s in enumerate(d["sections"]))
         ]
 
         section_names = {s.name for s in sections}
         transitions = []
-        for t in d.get("transitions") or []:
+        for i, t in enumerate(d.get("transitions") or []):
+            t = _as_mapping(t, i, "transitions", path)
             after = t.get("after_section")
             if after is not None and after not in section_names:
                 raise ValueError(
@@ -319,7 +338,10 @@ class Vehicle:
             shock_cord_mass_kg=U.lb_to_kg(float(rc.get("shock_cord_mass_lb", 0.0))),
             shock_cord_bay=rc.get("shock_cord_bay"),
             shock_cord_cg_from_front_m=opt_in_to_m(rc.get("shock_cord_cg_from_front_in")),
-            landing_sections=d.get("landing_sections", []),
+            landing_sections=[
+                _as_mapping(ls, i, "landing_sections", path)
+                for i, ls in enumerate(d.get("landing_sections") or [])
+            ],
             ballast_min_kg=U.lb_to_kg(float(ba.get("min_lb", 0.0))),
             ballast_max_kg=U.lb_to_kg(float(ba.get("max_lb", 0.0))),
             ballast_location=ba.get("location", sections[0].name if sections else ""),
