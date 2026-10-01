@@ -195,6 +195,7 @@ class Vehicle:
 
     sections: list[Section]
     transitions: list[Transition]
+    internal_bodies: list[dict]
 
     fin_count: int
     fin_root_chord_m: float
@@ -274,6 +275,39 @@ class Vehicle:
                 mass_kg=U.lb_to_kg(float(t.get("mass_lb", 0.0))),
             ))
 
+        #  A mass that rides inside a section but descends on its own tether, so
+        #  it lands as its own piece for req 3.2.  A tethered payload is the
+        #  usual case: it sits in the payload airframe on the pad and hangs
+        #  between the nose and that airframe coming down.
+        #
+        #  Its mass is ALREADY inside the parent section's as-built mass_lb --
+        #  the convention the whole file depends on -- so this moves mass across
+        #  rather than adding it.  The vehicle weighs the same and sits the same;
+        #  it just lands in more pieces.  Nothing here touches the flight model.
+        by_name = {s.name: s for s in sections}
+        internal_bodies = []
+        for i, b in enumerate(d.get("internal_bodies") or []):
+            b = _as_mapping(b, i, "internal_bodies", path)
+            name, inside = b["name"], b["inside"]
+            if inside not in by_name:
+                raise ValueError(
+                    f"{path.name}: internal_bodies[{i}] {name!r} is inside "
+                    f"{inside!r}, which is not a section; have {sorted(by_name)}"
+                )
+            mass_kg = U.lb_to_kg(float(b["mass_lb"]))
+            # Catching this here matters: an over-large body drives its parent's
+            # landing mass negative, and the mass budget still closes because the
+            # two cancel.  The symptom would be a KE check that quietly passes.
+            if mass_kg > by_name[inside].mass_kg:
+                raise ValueError(
+                    f"{path.name}: internal body {name!r} is "
+                    f"{U.kg_to_lb(mass_kg):.3f} lb but its section {inside!r} is "
+                    f"only {by_name[inside].mass_lb:.3f} lb. A section's mass_lb "
+                    f"is as-built and must already include everything inside it."
+                )
+            internal_bodies.append({"name": name, "inside": inside,
+                                    "mass_kg": mass_kg})
+
         def chute(key: str) -> dict:
             c = rc[key]
             dia = U.in_to_m(c["diameter_in"])
@@ -317,6 +351,7 @@ class Vehicle:
             nose_cg_from_tip_m=opt_in_to_m(nc.get("cg_from_tip_in")),
             sections=sections,
             transitions=transitions,
+            internal_bodies=internal_bodies,
             fin_count=int(fn["count"]),
             fin_root_chord_m=U.in_to_m(fn["root_chord_in"]),
             fin_tip_chord_m=U.in_to_m(fn["tip_chord_in"]),
@@ -441,6 +476,11 @@ class Vehicle:
             by_member[s.name] = s.mass_kg
         for t in self.transitions:
             by_member[t.name] = t.mass_kg
+        #  Move each tethered body out of its parent -- see from_yaml.  Done
+        #  before ballast so a body inside the ballast section cannot absorb it.
+        for b in self.internal_bodies:
+            by_member[b["name"]] = b["mass_kg"]
+            by_member[b["inside"]] -= b["mass_kg"]
         if ballast_kg:
             loc = self.ballast_location
             by_member[loc] = by_member.get(loc, 0.0) + ballast_kg
@@ -455,7 +495,8 @@ class Vehicle:
         claimed = {m for ls in self.landing_sections for m in ls["members"]}
         known = ({"nose_cone", "fins"}
                  | {s.name for s in self.sections}
-                 | {t.name for t in self.transitions})
+                 | {t.name for t in self.transitions}
+                 | {b["name"] for b in self.internal_bodies})
         return sorted(known - claimed)
 
 

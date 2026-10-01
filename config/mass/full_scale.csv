@@ -1,0 +1,84 @@
+# MASS PROPERTIES WORKSHEET -- Template Full-Scale   *** PLACEHOLDER ***
+#
+# Hand-authored worked example for config/vehicles/full_scale.yaml.  For a real
+# design, generate the worksheet from the .ork instead:
+#     python scripts/ork_to_mass_csv.py --ork design.ork --out config/mass/x.csv
+#
+# Per-section mass properties, then the sections combined.  Same arithmetic at
+# both levels:   CG = sum(mass * station) / sum(mass)
+#
+#   section      the yaml block this rolls into: nose_cone | fins | drogue |
+#                main | shock_cord | or a name from `sections:`.  AGGREGATE
+#                marks the combining table at the bottom.
+#   component    one part you can put on a scale.  SUBTOTAL closes a section.
+#   mass_lb      TOTAL for the row -- "centering rings, 0.750" is all three.
+#                No quantity column, so a row is never ambiguous.
+#   station_in   from the NOSE TIP, aft positive.  One datum for the whole
+#                vehicle.  On a SUBTOTAL row this IS that section CG.
+#   moment_lb_in mass_lb * station_in, taken from the ROUNDED cells beside it so
+#                the column adds up as it reads.  scripts/check_mass_csv.py
+#                recomputes every derived cell so none can go stale.
+#   source       weighed | vendor | ork | estimated | CONFIRM.  CONFIRM means
+#                nobody has stood behind this number yet.
+#
+# The motor is not here (OpenRocket supplies it) and neither is ballast (it is a
+# range, not a part -- see `ballast:` in the yaml).
+#
+section,component,mass_lb,station_in,moment_lb_in,source,note
+nose_cone,nose tip,0.250,1.50,0.375,vendor,aluminum tip
+nose_cone,nose shell,1.550,14.60,22.630,estimated,hollow ogive centroid ~0.56L
+nose_cone,nose bulkhead + eyebolt,0.300,25.50,7.650,estimated,
+nose_cone,nose shoulder,0.300,27.75,8.325,estimated,extends aft of the nose base into the payload bay
+nose_cone,SUBTOTAL,2.400,16.24,38.980,,CG = 38.980 / 2.400 = 16.24 in from nose tip
+
+Payload Bay,payload bay airframe,2.350,39.00,91.650,estimated,26 in of 6 in fiberglass
+Payload Bay,rover payload,3.600,36.00,129.600,CONFIRM,mass and station both unconfirmed
+Payload Bay,rover retention + rails,0.950,38.00,36.100,CONFIRM,
+Payload Bay,fwd bulkhead,0.400,27.00,10.800,estimated,
+Payload Bay,aft bulkhead + coupler,0.500,51.00,25.500,estimated,
+Payload Bay,SUBTOTAL,7.800,37.65,293.650,,CG = 293.650 / 7.800 = 37.65 in from nose tip
+
+Avionics Bay,avionics coupler tube,1.100,58.50,64.350,estimated,13 in coupler
+Avionics Bay,avionics sled,0.700,58.50,40.950,estimated,
+Avionics Bay,altimeters,0.300,57.00,17.100,vendor,two altimeters
+Avionics Bay,avionics batteries,0.600,60.00,36.000,vendor,two batteries
+Avionics Bay,switch band + switches,0.450,58.50,26.325,estimated,
+Avionics Bay,fwd bulkhead,0.700,52.80,36.960,estimated,
+Avionics Bay,aft bulkhead,0.750,64.20,48.150,estimated,
+Avionics Bay,SUBTOTAL,4.600,58.66,269.835,,CG = 269.835 / 4.600 = 58.66 in from nose tip
+
+Booster,booster airframe,3.450,84.00,289.800,estimated,38 in of 6 in fiberglass
+Booster,motor mount tube,1.300,90.75,117.975,estimated,24 in of 75 mm mount
+Booster,centering rings,0.750,90.00,67.500,estimated,three rings
+Booster,motor retainer,0.550,102.00,56.100,vendor,
+Booster,thrust plate,0.600,79.00,47.400,estimated,
+Booster,internal fillets + epoxy,0.700,92.00,64.400,estimated,easy to forget and worth half a pound
+Booster,rail buttons,0.150,88.00,13.200,vendor,
+Booster,booster misc hardware,1.700,84.00,142.800,CONFIRM,placeholder for what the build adds
+Booster,SUBTOTAL,9.200,86.87,799.175,,CG = 799.175 / 9.200 = 86.87 in from nose tip
+
+fins,fin set,1.800,93.50,168.300,estimated,three G10 fins
+fins,fin fillets,1.400,95.00,133.000,estimated,
+fins,SUBTOTAL,3.200,94.16,301.300,,CG = 301.300 / 3.200 = 94.16 in from nose tip
+
+drogue,drogue canopy + bag,0.450,70.00,31.500,vendor,packed in the booster
+drogue,SUBTOTAL,0.450,70.00,31.500,,CG = 31.500 / 0.450 = 70.00 in from nose tip
+
+main,main canopy,2.200,48.00,105.600,vendor,packed in the payload bay
+main,main deployment bag,0.400,47.00,18.800,vendor,
+main,SUBTOTAL,2.600,47.85,124.400,,CG = 124.400 / 2.600 = 47.85 in from nose tip
+
+shock_cord,main harness,0.850,50.00,42.500,vendor,
+shock_cord,drogue harness,0.500,68.00,34.000,vendor,
+shock_cord,SUBTOTAL,1.350,56.67,76.500,,CG = 76.500 / 1.350 = 56.67 in from nose tip
+
+# AGGREGATE -- the section subtotals above combined the same way
+AGGREGATE,nose_cone,2.400,16.24,38.980,
+AGGREGATE,Payload Bay,7.800,37.65,293.650,
+AGGREGATE,Avionics Bay,4.600,58.66,269.835,
+AGGREGATE,Booster,9.200,86.87,799.175,
+AGGREGATE,fins,3.200,94.16,301.300,
+AGGREGATE,drogue,0.450,70.00,31.500,
+AGGREGATE,main,2.600,47.85,124.400,
+AGGREGATE,shock_cord,1.350,56.67,76.500,
+AGGREGATE,VEHICLE TOTAL,31.600,61.24,1935.340,,"dry mass, no motor or ballast; CG = 1935.340 / 31.600 = 61.24 in from nose tip"
