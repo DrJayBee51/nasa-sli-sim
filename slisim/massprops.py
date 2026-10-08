@@ -63,7 +63,7 @@ class Sheet:
 
     def fronts(self) -> dict[str, Decimal]:
         """Each section's front station from the nose tip: the lengths before it."""
-        out, x = {}, Decimal(0)
+        out, x = {}, Decimal("0.00")
         for name, length in self.sections:
             out[name] = x
             x += length
