@@ -1,15 +1,12 @@
 # =============================================================================
 #  FULLSCALE MODEL A  --  transcribed from data/designs/Fullscale_Model_A.ork
 # =============================================================================
-#  Geometry and masses come from the .ork, read out by
-#      python scripts/ork_to_mass_csv.py \
-#          --ork data/designs/Fullscale_Model_A.ork \
-#          --out config/mass/fullscale_model_a.csv
-#  Every mass_lb / cg_*_in below is a SUBTOTAL row in that worksheet, so the two
-#  files agree by construction.  Re-run the script when the .ork changes, then
+#  Masses, section lengths and part positions come from the worksheet named in
+#  `mass_properties:`.  This file holds shapes, the motor, recovery hardware and
+#  engineering decisions.  After editing the worksheet, run
 #  `python scripts/check_mass_csv.py`.
 #
-#  Verify with:
+#  Verify against the GUI design with:
 #      python scripts/check_against_ork.py \
 #          --vehicle config/vehicles/fullscale_model_a.yaml \
 #          --ork data/designs/Fullscale_Model_A.ork
@@ -23,6 +20,7 @@ team: "REPLACE-WITH-TEAM-NAME"
 season: "2026-2027"
 status: "transcribed from data/designs/Fullscale_Model_A.ork; ballast and target unconfirmed"
 vehicle_type: full_scale
+mass_properties: fullscale_model_a.csv   # in config/mass/
 
 # --- Airframe ---------------------------------------------------------------
 airframe:
@@ -37,37 +35,22 @@ airframe:
 nose_cone:
   shape: ellipsoid
   shape_parameter: 1.0        # unused by ellipsoid; kept for schema completeness
-  length_in: 16.0
   wall_thickness_in: 0.0787   # 0.002 m
   shoulder_length_in: 5.5     # req 2.5.3 needs >= 2.58 in (0.5 body diameter)
-  mass_lb: 1.487              # shell + bulkhead; the shock cord is declared below
-  cg_from_tip_in: 10.22
 
-# --- Body sections, nose-to-tail --------------------------------------------
-#  Two tubes, not three: the avionics bay is a sealed region INSIDE the payload
-#  airframe (bulkheads at 35.88 and 41.23 in), not a separate tube, so it is part
-#  of that section's mass rather than a section of its own.
-sections:
-  - name: "Payload Airframe"
-    length_in: 31.0
-    mass_lb: 12.512           # tube, payload, AV bay, coupler, 2 bulkheads
-    cg_from_front_in: 13.41
-  - name: "Booster Airframe"
-    length_in: 22.0
-    mass_lb: 2.734            # tube, motor tube, bulkhead, 2 rings, rail buttons
-    cg_from_front_in: 11.35
+# --- Body sections ----------------------------------------------------------
+#  Defined in the worksheet.  Two tubes, not three: the avionics bay is a sealed
+#  region INSIDE the payload airframe, not a separate tube.
 
 # --- Transitions ------------------------------------------------------------
+#  Length, mass and position come from the worksheet's Boattail section.
 transitions:
   - name: "Boattail"
-    after_section: "Booster Airframe"
     fore_diameter_in: 5.15
     aft_diameter_in: 2.953    # 0.0375 m radius
-    length_in: 2.50
     shape: ogive
     shape_parameter: 1.0
     wall_thickness_in: 0.0787
-    mass_lb: 0.137
 
 # --- Fins -------------------------------------------------------------------
 fins:
@@ -79,7 +62,6 @@ fins:
   thickness_in: 0.118         # 0.003 m
   cant_deg: 0.0
   offset_from_aft_in: 0.0     # trailing edge is flush with the airframe aft end
-  mass_lb: 0.541              # whole set, all four fins
 
 # --- Rail buttons -----------------------------------------------------------
 rail_guide:
@@ -89,11 +71,6 @@ rail_guide:
 # --- Motor ------------------------------------------------------------------
 #  The .ork carries four configurations (K1100T, K1103X, K780R, K1800ST-P).
 #  This is the default one and the one its saved simulation flew.
-#
-#  NOTE req 2.7: K1800ST-P is NOT on the NASA-supported availability list.  It is
-#  inside the 5,120 N-s college limit at 2,452 N-s (req 2.9), so this is an
-#  availability risk rather than a rules violation -- `list_motors.py --nasa`
-#  shows the supported set.
 #
 #  The -P suffix is the plugged variant, which is what req 3.1.3 requires: no
 #  motor ejection.  The framework plugs the motor regardless.
@@ -117,8 +94,8 @@ motor:
   ignition_delay_s: 0.0
 
 # --- Recovery ---------------------------------------------------------------
-#  Both parachutes carry mass overrides in the .ork, so these masses are the
-#  values someone typed there, not density estimates.
+#  Masses and positions come from the worksheet's main, drogue and shock_cord
+#  rows; each item's bay is the section its position falls in.
 recovery:
   drogue:
     name: "Drogue Parachute"
@@ -126,38 +103,17 @@ recovery:
     cd: 1.5
     deploy_event: apogee
     deploy_delay_s: 0.0       # req 3.1.2 allows up to 2.0 s
-    mass_lb: 0.500
-    bay: "Booster Airframe"   # .ork station 50.49 in, aft of the coupler
-    cg_from_front_in: 3.49
   main:
     name: "Main Parachute"
     diameter_in: 84.0
     cd: 2.2
     deploy_event: altitude
     deploy_altitude_ft: 600.0 # 182.88 m; req 3.1.1 needs >= 500 ft
-    mass_lb: 1.179
-    bay: "Payload Airframe"   # .ork station 33.49 in
-    cg_from_front_in: 17.49
-  # Three separate cords in the .ork (nose, payload, booster), lumped as the
-  # schema requires, at the station where the three together balance.
-  shock_cord_mass_lb: 0.156
-  shock_cord_bay: "Payload Airframe"
-  shock_cord_cg_from_front_in: 12.65
 
-# --- Tethered internal bodies -----------------------------------------------
-#  The payload is not fixed in the airframe: on the pad it rides inside the
-#  payload tube, and on descent it hangs on its own tether between the nose cone
-#  and that tube, landing as a fourth independent piece.
-#
-#  It is declared here rather than as a `sections:` entry because it is not a
-#  tube -- it has no airframe, no diameter and no station in the chain.  Its
-#  6.000 lb is already inside Payload Airframe's as-built 12.512 lb, so this
-#  moves mass between landing pieces without changing the vehicle: same launch
-#  mass, same CG, same trajectory.  Only req 3.2 sees it.
-internal_bodies:
-  - name: "Payload"
-    inside: "Payload Airframe"
-    mass_lb: 6.000            # .ork Payload mass component, station 21.00 in
+# --- Tethered payload -------------------------------------------------------
+#  The worksheet's `tethered` row: the payload rides inside the payload tube on
+#  the pad and lands on its own tether.  It moves mass between landing pieces
+#  without changing the flight.
 
 # --- Independent sections at landing (req 3.2) ------------------------------
 #  Four independent bodies, per the team's recovery architecture.  This is NOT

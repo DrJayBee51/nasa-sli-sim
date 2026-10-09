@@ -124,6 +124,107 @@ def _vehicle_type(d: dict, path: Path) -> str:
     return vt
 
 
+def _apply_mass_sheet(d: dict, path: Path) -> dict:
+    """Fill lengths, masses and positions in from the vehicle's worksheet.
+
+    `mass_properties:` names a CSV in config/mass/ (or a path).  Its sections,
+    nose to tail, are the nose cone, the body sections, then any transitions;
+    the yaml keeps shapes and decisions.  Each value lands in the key the yaml
+    would otherwise hold, so nothing downstream knows which file it came from.
+
+    A key in both files is an error, not an override: a stale mass_lb left in
+    the yaml would read as data, and nobody could tell which number was flown.
+    """
+    from . import massprops
+
+    ref = Path(d["mass_properties"])
+    sheet_path = ref if ref.is_absolute() or ref.exists() else CONFIG_DIR / "mass" / ref
+    if not sheet_path.is_file():
+        raise FileNotFoundError(f"{path.name}: mass_properties {ref} not found "
+                                f"(looked in {CONFIG_DIR / 'mass'})")
+    sheet, problems = massprops.read(sheet_path)
+    if problems:
+        raise ValueError(f"{sheet_path.name} has {len(problems)} problem(s); run "
+                         f"scripts/check_mass_csv.py:\n  " + "\n  ".join(problems))
+    roll = massprops.rollup(sheet)
+    secs, kinds = roll["sections"], roll["kinds"]
+    names = [n for n, _ in sheet.sections]
+
+    def put(block: dict, key: str, value, where: str) -> None:
+        if key in block:
+            raise ValueError(f"{path.name}: {where}.{key} comes from "
+                             f"{sheet_path.name}; delete it from the yaml")
+        block[key] = value
+
+    for key in ("sections", "internal_bodies"):
+        if key in d:
+            raise ValueError(f"{path.name}: `{key}:` comes from "
+                             f"{sheet_path.name}; delete it from the yaml")
+
+    trans = {t.get("name"): t for t in d.get("transitions") or []
+             if isinstance(t, dict)}
+    unknown = set(trans) - set(names)
+    if unknown:
+        raise ValueError(f"{path.name}: transition(s) {sorted(unknown)} have no "
+                         f"section in {sheet_path.name}; have {names}")
+    nose, body = names[0], [n for n in names[1:] if n not in trans]
+
+    nc = d["nose_cone"]
+    put(nc, "length_in", secs[nose]["length_in"], "nose_cone")
+    put(nc, "mass_lb", secs[nose]["mass_lb"], "nose_cone")
+    if secs[nose]["cg_in"] is not None:
+        put(nc, "cg_from_tip_in", secs[nose]["cg_in"], "nose_cone")
+
+    d["sections"] = [
+        {"name": n, "length_in": secs[n]["length_in"], "mass_lb": secs[n]["mass_lb"],
+         **({"cg_from_front_in": secs[n]["cg_in"] - secs[n]["front_in"]}
+            if secs[n]["cg_in"] is not None else {})}
+        for n in body
+    ]
+
+    #  The sheet's order says where a transition goes: after the section above it.
+    for n, t in trans.items():
+        put(t, "length_in", secs[n]["length_in"], f"transitions[{n}]")
+        put(t, "mass_lb", secs[n]["mass_lb"], f"transitions[{n}]")
+        before = names[names.index(n) - 1]
+        if before not in body or t.get("after_section", before) != before:
+            raise ValueError(f"{path.name}: transition {n!r} follows {before!r} "
+                             f"in {sheet_path.name}, which must be a body "
+                             f"section matching any after_section in the yaml")
+        t["after_section"] = before
+
+    def bay(cg_in: float) -> str:
+        """The body section a recovery item's CG falls in (else the nearest)."""
+        for n in body:
+            if secs[n]["front_in"] <= cg_in < secs[n]["front_in"] + secs[n]["length_in"]:
+                return n
+        return min(body, key=lambda n: abs(secs[n]["front_in"] - cg_in))
+
+    rc = d["recovery"]
+    if "fins" in kinds:
+        put(d["fins"], "mass_lb", kinds["fins"]["mass_lb"], "fins")
+    for key in ("main", "drogue"):
+        if key in kinds:
+            k = kinds[key]
+            b = bay(k["cg_in"])
+            put(rc[key], "mass_lb", k["mass_lb"], f"recovery.{key}")
+            put(rc[key], "bay", b, f"recovery.{key}")
+            put(rc[key], "cg_from_front_in", k["cg_in"] - secs[b]["front_in"],
+                f"recovery.{key}")
+    if "shock_cord" in kinds:
+        k = kinds["shock_cord"]
+        b = bay(k["cg_in"])
+        put(rc, "shock_cord_mass_lb", k["mass_lb"], "recovery")
+        put(rc, "shock_cord_bay", b, "recovery")
+        put(rc, "shock_cord_cg_from_front_in", k["cg_in"] - secs[b]["front_in"],
+            "recovery")
+
+    if roll["tethered"]:
+        d["internal_bodies"] = [{"name": c, "inside": s, "mass_lb": m}
+                                for c, s, m in roll["tethered"]]
+    return d
+
+
 def _as_mapping(item: Any, index: int, block: str, path: Path) -> dict:
     """One entry of a list-of-mappings yaml block.
 
@@ -233,6 +334,8 @@ class Vehicle:
     def from_yaml(cls, path: str | Path | None = None) -> "Vehicle":
         path = Path(path) if path else default_vehicle_path()
         d = _load_yaml(path)
+        if d.get("mass_properties"):
+            d = _apply_mass_sheet(d, path)
 
         af, nc, fn = d["airframe"], d["nose_cone"], d["fins"]
         mo, rc = d["motor"], d["recovery"]

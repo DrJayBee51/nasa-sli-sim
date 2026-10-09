@@ -1,10 +1,10 @@
 """Mass-properties worksheets: config/mass/*.csv.
 
-One row per part: its mass, and where it sits measured from the front of the
-section it is in.  A SECTION row closes each section with its length and that
-section's totals, and an AGGREGATE block combines the sections into the
-vehicle.  USER_GUIDE section 2.10 describes the layout for the people filling
-it in.
+One row per part: its mass, where it sits measured from the front of the
+section it is in, its own inertia, and the uncertainty in each.  A SECTION row
+closes each section with its length and that section's totals, and an
+AGGREGATE block combines the sections into the vehicle.  USER_GUIDE section
+2.10 describes the layout for the people filling it in.
 
 The derived cells -- positions from the nose tip, moments, every total -- are
 stored so a student can follow the arithmetic, and are trusted only after
@@ -13,6 +13,12 @@ the generator and the checker cannot disagree about what a correct sheet is.
 
 Rounding is half-up, the way a spreadsheet's ROUND() does it, and every total
 sums the values as printed, so a column adds up exactly as it reads.
+
+Inertia is each part's own, about its own CG, in lb*in^2 -- SolidWorks' Mass
+Properties "taken at the center of mass" (Lxx, Lyy, Lzz), with X along the
+rocket axis.  Pitch is Lyy (average Lyy and Lzz if they differ), roll is Lxx.
+A total's pitch inertia is about that total's CG, by the parallel-axis theorem;
+roll needs no offset term, because every part sits on the rocket axis.
 """
 
 from __future__ import annotations
@@ -22,11 +28,15 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
-COLUMNS = ["section", "component", "kind", "mass_lb", "length_in",
-           "section_front_in", "from_section_front_in", "from_nose_tip_in",
-           "moment_lb_in", "source", "note"]
-NUMERIC = ("mass_lb", "length_in", "section_front_in", "from_section_front_in",
-           "from_nose_tip_in", "moment_lb_in")
+COLUMNS = ["section", "component", "kind", "mass_lb", "mass_sigma_pct",
+           "length_in", "section_front_in", "from_section_front_in",
+           "position_sigma_in", "from_nose_tip_in", "moment_lb_in",
+           "inertia_pitch_lb_in2", "inertia_roll_lb_in2", "inertia_sigma_pct",
+           "source", "note"]
+NUMERIC = ("mass_lb", "mass_sigma_pct", "length_in", "section_front_in",
+           "from_section_front_in", "position_sigma_in", "from_nose_tip_in",
+           "moment_lb_in", "inertia_pitch_lb_in2", "inertia_roll_lb_in2",
+           "inertia_sigma_pct")
 
 #  What a part counts toward.  `section` says where it physically is; `kind` says
 #  which part of the vehicle model it belongs to, so a parachute packed in the
@@ -37,7 +47,7 @@ SOURCES = ("weighed", "cad", "vendor", "override", "ork", "estimated", "CONFIRM"
 
 SECTION, AGGREGATE, TOTAL = "SECTION", "AGGREGATE", "VEHICLE TOTAL"
 #  Mass to three decimals: a rail button is 0.002 lb, and two would drop it.
-MASS_DP, STATION_DP = Decimal("0.001"), Decimal("0.01")
+MASS_DP, STATION_DP, INERTIA_DP = Decimal("0.001"), Decimal("0.01"), Decimal("0.001")
 
 
 def q(x, dp: Decimal) -> Decimal:
@@ -54,6 +64,11 @@ class Part:
     from_front_in: Decimal      # from the front of its own section
     source: str
     note: str = ""
+    inertia_pitch: Decimal = Decimal(0)     # own, about own CG, lb*in^2
+    inertia_roll: Decimal = Decimal(0)
+    mass_sigma_pct: Decimal = Decimal(0)
+    position_sigma_in: Decimal = Decimal(0)
+    inertia_sigma_pct: Decimal = Decimal(0)
 
 
 @dataclass
@@ -70,6 +85,23 @@ class Sheet:
         return out
 
 
+def combine(items) -> tuple[Decimal, Decimal | str, Decimal, Decimal, Decimal]:
+    """(mass, CG, moment, pitch, roll) of items given as (mass, x, pitch, roll).
+
+    Uses the values as printed, so the totals follow from the cells above them.
+    """
+    items = list(items)
+    mass = sum((m for m, _, _, _ in items), Decimal(0))
+    moment = sum((q(m * x, MASS_DP) for m, x, _, _ in items), Decimal(0))
+    if not mass:
+        return mass, "", moment, Decimal(0), Decimal(0)
+    cg = q(moment / mass, STATION_DP)
+    pitch = q(sum((ip + m * (x - cg) ** 2 for m, x, ip, _ in items), Decimal(0)),
+              INERTIA_DP)
+    roll = sum((ir for _, _, _, ir in items), Decimal(0))
+    return mass, cg, moment, pitch, roll
+
+
 def table(sheet: Sheet) -> list[list | None]:
     """Every row of the worksheet with its derived cells filled in.
 
@@ -79,26 +111,28 @@ def table(sheet: Sheet) -> list[list | None]:
     rows: list[list | None] = []
     totals = []
     for name, length in sheet.sections:
-        front, mass, moment = fronts[name], Decimal(0), Decimal(0)
+        front, items = fronts[name], []
         for p in (p for p in sheet.parts if p.section == name):
             x = front + p.from_front_in
-            m = q(p.mass_lb * x, MASS_DP)
-            rows.append([name, p.component, p.kind, p.mass_lb, "", "",
-                         p.from_front_in, x, m, p.source, p.note])
-            mass += p.mass_lb
-            moment += m
-        cg = q(moment / mass, STATION_DP) if mass else ""
-        rows.append([name, SECTION, "", mass, length, front,
-                     cg - front if mass else "", cg, moment, "", ""])
+            rows.append([name, p.component, p.kind, p.mass_lb, p.mass_sigma_pct,
+                         "", "", p.from_front_in, p.position_sigma_in, x,
+                         q(p.mass_lb * x, MASS_DP), p.inertia_pitch, p.inertia_roll,
+                         p.inertia_sigma_pct, p.source, p.note])
+            items.append((p.mass_lb, x, p.inertia_pitch, p.inertia_roll))
+        mass, cg, moment, pitch, roll = combine(items)
+        rows.append([name, SECTION, "", mass, "", length, front,
+                     cg - front if mass else "", "", cg, moment, pitch, roll,
+                     "", "", ""])
         rows.append(None)
-        totals.append((name, mass, length, front, cg, moment))
+        totals.append((name, mass, length, front, cg, moment, pitch, roll))
 
-    for name, mass, length, front, cg, moment in totals:
-        rows.append([AGGREGATE, name, "", mass, length, front, "", cg, moment, "", ""])
-    mass = sum(t[1] for t in totals)
-    moment = sum(t[5] for t in totals)
-    rows.append([AGGREGATE, TOTAL, "", mass, sum(t[2] for t in totals), "", "",
-                 q(moment / mass, STATION_DP) if mass else "", moment, "",
+    for name, mass, length, front, cg, moment, pitch, roll in totals:
+        rows.append([AGGREGATE, name, "", mass, "", length, front, "", "", cg,
+                     moment, pitch, roll, "", "", ""])
+    mass, cg, moment, pitch, roll = combine(
+        (t[1], t[4], t[6], t[7]) for t in totals if t[1])
+    rows.append([AGGREGATE, TOTAL, "", mass, "", sum(t[2] for t in totals), "",
+                 "", "", cg, moment, pitch, roll, "", "",
                  "dry: no motor, no ballast"])
     return rows
 
@@ -135,6 +169,10 @@ def read(path: Path) -> tuple[Sheet | None, list[str]]:
         lines = [(reader.line_num, r) for r in reader if any(c.strip() for c in r)]
 
     missing = [c for c in COLUMNS if c not in header]
+    if len(missing) == len(COLUMNS):
+        return None, [f"line 1 is not the column-name row (it starts "
+                      f"{','.join(header)[:40]!r}); the first line must be "
+                      f"{','.join(COLUMNS)}"]
     if missing:
         return None, [f"line 1: missing column(s) {missing}; expected {COLUMNS}"]
     col = {c: header.index(c) for c in COLUMNS}
@@ -176,19 +214,33 @@ def read(path: Path) -> tuple[Sheet | None, list[str]]:
                             f"has its SECTION row")
             current = sec
         kind, source = cell(r, "kind"), cell(r, "source")
-        mass, x = _dec(cell(r, "mass_lb")), _dec(cell(r, "from_section_front_in"))
         where = f"line {ln}, {sec} / {comp}"
         if kind not in KINDS:
             problems.append(f"{where}: kind {kind!r} is not one of {list(KINDS)}")
         if source not in SOURCES:
             problems.append(f"{where}: source {source!r} is not one of {list(SOURCES)}")
-        if mass is None or mass < 0:
-            problems.append(f"{where}: mass_lb {cell(r, 'mass_lb')!r} is not a number >= 0")
-        if x is None:
-            problems.append(f"{where}: from_section_front_in "
-                            f"{cell(r, 'from_section_front_in')!r} is not a number")
-        parts.append(Part(sec, comp, kind, mass or Decimal(0), x or Decimal(0),
-                          source, cell(r, "note")))
+
+        def number(name, minimum=None):
+            v = _dec(cell(r, name))
+            if v is None:
+                problems.append(f"{where}: {name} {cell(r, name)!r} is not a number"
+                                + (" (a sigma of 0 means exact)" if "sigma" in name else ""))
+                return Decimal(0)
+            if minimum is not None and v < minimum:
+                problems.append(f"{where}: {name} {v} is below {minimum}")
+            return v
+
+        parts.append(Part(
+            sec, comp, kind,
+            mass_lb=number("mass_lb", 0),
+            from_front_in=number("from_section_front_in"),
+            source=source, note=cell(r, "note"),
+            inertia_pitch=number("inertia_pitch_lb_in2", 0),
+            inertia_roll=number("inertia_roll_lb_in2", 0),
+            mass_sigma_pct=number("mass_sigma_pct", 0),
+            position_sigma_in=number("position_sigma_in", 0),
+            inertia_sigma_pct=number("inertia_sigma_pct", 0),
+        ))
     if current is not None:
         problems.append(f"{current!r} has no SECTION row closing it")
     if not sections:

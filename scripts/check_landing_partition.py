@@ -50,14 +50,30 @@ def check(vehicle: Vehicle, ballast_kg: float) -> list[str]:
     return bad
 
 
+#  The smallest vehicle that loads, for exercising a bad internal_bodies entry.
+#  Self-contained so it does not depend on how any real vehicle declares its
+#  tethered bodies -- a worksheet-backed vehicle has no yaml block to edit.
+FIXTURE = """\
+name: "partition fixture"
+airframe: {outer_diameter_in: 4.0, wall_thickness_in: 0.1}
+nose_cone: {shape: ogive, length_in: 12.0, wall_thickness_in: 0.1, mass_lb: 1.0}
+sections:
+  - {name: "Payload Airframe", length_in: 20.0, mass_lb: 8.0}
+fins: {count: 3, root_chord_in: 6.0, tip_chord_in: 3.0, sweep_in: 3.0,
+       height_in: 4.0, thickness_in: 0.1, mass_lb: 0.5}
+motor: {search: "K1100T", mount_inner_diameter_in: 2.2, mount_length_in: 12.0}
+recovery:
+  drogue: {diameter_in: 12.0, cd: 1.5}
+  main: {diameter_in: 48.0, cd: 2.2}
+landing_sections:
+  - {name: "all", members: ["nose_cone", "Payload Airframe", "fins", "Payload"]}
+internal_bodies:
+"""
+
+
 def rejects(tmp: Path, body: str, why: str) -> str | None:
     """A bad internal_bodies entry must raise at load, not load and mislead."""
-    base = Path("config/vehicles/fullscale_model_a.yaml").read_text(encoding="utf-8")
-    assert "internal_bodies:" in base, "fixture vehicle no longer has internal_bodies"
-    head, _, tail = base.partition("internal_bodies:")
-    # Replace the block up to the next top-level comment banner.
-    tail = tail[tail.index("\n# ---"):]
-    tmp.write_text(head + "internal_bodies:\n" + body + tail, encoding="utf-8")
+    tmp.write_text(FIXTURE + body, encoding="utf-8")
     try:
         Vehicle.from_yaml(tmp)
     except ValueError:
