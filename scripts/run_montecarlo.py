@@ -50,6 +50,18 @@ def _refresh_latest(run_dir: Path) -> None:
     print(f"  Wrote {latest}{os.sep}  (copy of this run)")
 
 
+def _spread(spec: dict) -> str:
+    """One uncertainty entry's dispersion, as a short phrase."""
+    dist = spec.get("distribution", "normal")
+    if dist == montecarlo.WORKSHEET:
+        return "frozen" if spec.get("frozen") else "per-part sigmas in the mass worksheet"
+    if dist == "uniform":
+        return f"uniform[{spec['low']:g}, {spec['high']:g}]"
+    sigma = spec.get("sigma")
+    out = f"{dist}, sigma={'site' if sigma is None else f'{sigma:g}'}"
+    return out + (" (relative)" if spec.get("relative") else "")
+
+
 def _sigma_record(unc: dict) -> str:
     """The dispersions this run actually used, for the report.
 
@@ -58,17 +70,7 @@ def _sigma_record(unc: dict) -> str:
     afterwards, and "which uncertainty.yaml produced this" is exactly the
     question a reviewer asks.
     """
-    lines = []
-    for name, spec in sorted(unc.items()):
-        dist = spec.get("distribution", "normal")
-        if dist == "uniform":
-            spread = f"uniform[{spec['low']:g}, {spec['high']:g}]"
-        else:
-            sigma = spec.get("sigma")
-            spread = f"{dist}, sigma={'site' if sigma is None else f'{sigma:g}'}"
-            if spec.get("relative"):
-                spread += " (relative)"
-        lines.append(f"| `{name}` | {spread} |")
+    lines = [f"| `{name}` | {_spread(spec)} |" for name, spec in sorted(unc.items())]
     return "| Parameter | Dispersion |\n|---|---|\n" + "\n".join(lines)
 
 
@@ -96,17 +98,8 @@ def _list_parameters(unc: dict) -> int:
     print("Parameters available to --only / --freeze (config/uncertainty.yaml):")
     print()
     for name, spec in unc.items():
-        dist = spec.get("distribution", "normal")
-        if dist == "uniform":
-            spread = f"uniform[{spec['low']:g}, {spec['high']:g}]"
-        else:
-            sig = spec.get("sigma")
-            sig = "site" if sig is None else f"{sig:g}"
-            spread = f"{dist}, sigma={sig}"
-            if spec.get("relative"):
-                spread += " (relative)"
         mark = "  " if name in montecarlo.OPENROCKET_PARAMETERS else " *"
-        print(f" {mark} {name:<26} {spread}")
+        print(f" {mark} {name:<26} {_spread(spec)}")
     print()
     print(" * RocketPy only -- OpenRocket disperses launch conditions only.")
     return 0
@@ -144,7 +137,8 @@ def main() -> int:
     except KeyError as exc:
         print(f"error: {exc.args[0]}")
         return 2
-    dispersed = montecarlo.dispersed_parameters(unc)
+    vehicle   = Vehicle.from_yaml(args.vehicle)
+    dispersed = montecarlo.dispersed_parameters(unc, vehicle)
     held = [k for k in unc if k not in dispersed]
     if not dispersed:
         print("error: every parameter is held nominal; nothing to disperse")
@@ -157,7 +151,6 @@ def main() -> int:
               "or see --list-parameters.")
         return 2
 
-    vehicle   = Vehicle.from_yaml(args.vehicle)
     site      = Site.from_yaml(args.site)
     out_dir   = output_dir(args.out, vehicle, "mc")
     ballast   = vehicle.ballast_min_kg if args.ballast == "min" else vehicle.ballast_max_kg
@@ -175,6 +168,20 @@ def main() -> int:
         print(f"Varying : {', '.join(dispersed)}")
         print(f"Nominal : {', '.join(held)}")
     print()
+
+    # A campaign with no mass dispersion looks exactly like one with it, and
+    # its stability and KE probabilities are quietly too optimistic.  Say so,
+    # unless the run deliberately narrowed what it disperses.
+    mass_dispersed = bool({"mass_properties", "dry_mass"} & set(dispersed))
+    if not mass_dispersed and not (only or freeze):
+        sheet = vehicle.mass_sheet.name if vehicle.mass_sheet else "no worksheet"
+        print("  " + "!" * 74)
+        print("  !!  NO MASS DISPERSION: every part sigma is 0 "
+              f"({sheet}) and dry_mass sigma is 0.")
+        print("  !!  Mass, CG and inertia are flown at nominal in every case.  Fill in the")
+        print("  !!  sigma columns of the mass worksheet before quoting these results.")
+        print("  " + "!" * 74)
+        print()
 
     df = montecarlo.run_montecarlo(
         vehicle, site, n=args.samples, engine=args.engine,
@@ -262,6 +269,8 @@ def main() -> int:
              f"({motor_info['total_impulse_ns']:.0f} N-s)\n"
              f"- Dispersed: {', '.join(dispersed)}\n"
              f"- Held nominal: {', '.join(held) or 'none'}\n"
+             f"- Mass dispersion: "
+             f"{'yes' if mass_dispersed else 'NONE (all mass sigmas 0)'}\n"
              f"- Failed cases: {failed}"),
             ("Dispersions used", _sigma_record(unc)),
             ("Dispersion summary",

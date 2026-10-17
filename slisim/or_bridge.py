@@ -499,7 +499,8 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
         chute.setMassOverridden(True)
         chute.setAxialMethod(AxialMethod.TOP)
         cg = spec.get("cg_from_front_m")
-        chute.setAxialOffset(cg if cg is not None
+        # TOP places the pack's forward face; its CG is half a pack further aft.
+        chute.setAxialOffset(cg - chute.getLength() / 2.0 if cg is not None
                              else parent.getLength() * offset_frac)
         cfg = chute.getDeploymentConfigurations().getDefault()
         if spec["deploy_event"] == "altitude":
@@ -530,7 +531,8 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
             cord.setAxialOffset(0.0)
         else:
             cord.setAxialMethod(AxialMethod.TOP)
-            cord.setAxialOffset(vehicle.shock_cord_cg_from_front_m)
+            cord.setAxialOffset(vehicle.shock_cord_cg_from_front_m
+                                - cord.getLength() / 2.0)
         parent.addChild(cord)
 
     # --- flight configuration + motor

@@ -71,40 +71,40 @@ both engines, and checks every requirement. Three blocks of output:
 ```
 Vehicle : Template Full-Scale  [PLACEHOLDER - not a real design]
 Site    : Bragg Farms, Toney AL (NASA Student Launch competition site)
-Length  : 103.0 in   Diameter: 6.00 in
+Length  : 93.0 in   Diameter: 6.00 in
   Motor   : L1520T (AeroTech)  3769 N-s, 1.773 kg propellant
   Saved   : ...\output\template_full_scale\nominal\template_full-scale_0lb.ork
 ```
 
 That `.ork` is a real OpenRocket file. **Open it in the GUI now** — it is the
 quickest way to convince yourself the framework is modeling what you think it
-is. You will see the nose cone, three body sections, the fin set, rail buttons,
-motor mount, and both parachutes.
+is. You will see the nose cone, two body tubes, the boat tail, the fin set,
+rail buttons, motor mount, and both parachutes.
 
 **Block 2 — the two engines side by side.**
 
 ```
 quantity                 units    OpenRocket     RocketPy       diff        %
-Apogee                   ft          4534.22      4536.87       2.65      0.1
-Max velocity             fps          606.03       606.20       0.17      0.0
-Static stability         cal            2.18         2.19       0.01      0.5
-Rail exit velocity       fps           78.81        70.42      -8.38    -10.6
-Drift from pad           ft          1355.00      1218.70    -136.30    -10.1
+Apogee                   ft          5263.28      5266.02       2.73      0.1
+Max velocity             fps          716.40       716.47       0.07      0.0
+Static stability         cal            2.36         2.36       0.00      0.1
+Rail exit velocity       fps           88.62        77.78     -10.84    -12.2
+Drift from pad           ft          1467.66      1326.33    -141.33     -9.6
 ```
 
-Apogee agreeing to 0.07% across two independent integrators is a strong result
+Apogee agreeing to 0.05% across two independent integrators is a strong result
 and is exactly the evidence the handbook's "different calculation method"
 bullet is asking for.
 
 The two rows that *don't* agree are expected, and knowing why is the difference
 between a good report and a great one:
 
-- **Rail exit velocity (−10.6%).** The two tools define "off the rail"
+- **Rail exit velocity (−12.2%).** The two tools define "off the rail"
   differently. OpenRocket releases the vehicle when the forward rail button
   passes the rail tip; RocketPy when the center of mass has traveled the full
   rail length. RocketPy reads lower, so quoting RocketPy for requirement 2.14
   (≥52 fps) is the conservative choice.
-- **Drift (−10%).** This one originates during *ascent*, not descent. The
+- **Drift (−9.6%).** This one originates during *ascent*, not descent. The
   descent phases agree to under 2%. RocketPy leaves the rail slower (see
   above), so it enters free flight at a larger angle of attack relative to the
   wind, weathercocks harder, and reaches apogee further upwind. Because net
@@ -116,13 +116,14 @@ between a good report and a great one:
 **Block 3 — requirement compliance.** Every check cites its handbook paragraph.
 
 ```
-  PASS    2.11     Static stability on pad          2.18 cal      >= 2.0
+  PASS    2.11     Static stability on pad          2.36 cal      >= 2.0
                    `-- evaluated at Mach 0.3, matching OpenRocket's GUI convention
-  PASS    3.2      KE at landing: Avionics Bay + Booster   56.06 ft-lbf   <= 75
-                   `-- 17.00 lb at 14.6 fps descent rate; incl. horizontal drift = 106.5 ft-lbf (over 75)
+  PASS    3.2      KE at landing: Booster + Boattail   40.16 ft-lbf   <= 75
+                   `-- 11.64 lb at 14.9 fps descent rate; incl. horizontal drift = 79.6 ft-lbf (over 75)
 ```
 
 Read that second note carefully — it is discussed in [§5.3](#53-the-kinetic-energy-subtlety).
+The booster's 11.64 lb includes the spent motor case, which lands with it.
 
 Three status levels:
 
@@ -141,7 +142,7 @@ and maximum ballast configurations. One command:
 python scripts/run_nominal.py --ballast both
 ```
 
-The max-ballast case lands about 340 ft lower. That is ballast doing its job —
+The max-ballast case lands about 245 ft lower. That is ballast doing its job —
 it is a trim knob — but it means the altitude you declare at CDR should be
 chosen knowing your ballast range, not from the minimum-ballast run alone.
 
@@ -193,20 +194,25 @@ output has four parts.
 
 ```
 | req | requirement                 | P(pass) | mean     | p05      | p95      |
-| 2.1 | Apogee in 4,000-6,000 ft    | 0.985   | 4460.1   | 4068.2   | 4818.4   |
-| 2.11| Stability >= 2.0 cal        | 1.000   | 2.204    | 2.108    | 2.328    |
+| 2.1 | Apogee in 4,000-6,000 ft    | 1.000   | 5141.1   | 4704.7   | 5591.4   |
+| 2.11| Stability >= 2.0 cal        | 1.000   | 2.358    | 2.350    | 2.367    |
 ```
 
-This is the payoff. Not "our apogee is 4,533 ft" but **"98.5% of dispersed
-cases land inside the required window, with a 95% interval of 4,068 to 4,818
-ft."** That is a defensible statement.
+This is the payoff. Not "our apogee is 5,263 ft" but **"every one of 1,000
+dispersed cases lands inside the required window, with a 95% interval of 4,705
+to 5,591 ft."** That is a defensible statement.
+
+That stability row is suspiciously tight — 2.350 to 2.367 — and the run opened
+with a banner saying why: the shipped mass worksheet has every sigma at 0, so
+mass and CG never vary. Fill in the sigma columns (§2.10) before quoting a
+stability or kinetic-energy probability.
 
 **Recommended target altitude:**
 
 ```
-    Recommended declaration : 4,440 ft
-    95% CI                  : [4,068, 4,818] ft
-    P(4,000-6,000 ft)       : 98.5%
+    Recommended declaration : 5,130 ft
+    95% CI                  : [4,705, 5,591] ft
+    P(4,000-6,000 ft)       : 100.0%
 ```
 
 Requirement 2.3 scores you on closeness to the altitude you declare at CDR. The
@@ -216,22 +222,23 @@ not the nominal run, and not the middle of the legal window.
 **Sensitivity** — what actually drives apogee (1,000 cases, seed 12345):
 
 ```
-| motor_total_impulse |  0.605 |
-| drag_coefficient    | -0.528 |
-| dry_mass            | -0.267 |
-| wind_speed_mps      | -0.226 |
-| rail_angle_deg      | -0.159 |
-| temperature_k       |  0.098 |
+| drag_coefficient    | -0.626 |
+| motor_total_impulse |  0.533 |
+| wind_speed_mps      | -0.256 |
+| temperature_k       |  0.190 |
+| rail_angle_deg      | -0.141 |
+| pressure_pa         | -0.067 |
 ```
 
-Spearman rank correlation. Motor impulse and drag dominate — and of those two,
+Spearman rank correlation. Drag and motor impulse dominate — and of those two,
 motor scatter is fixed at the factory while drag is something you can measure.
 That is where the effort belongs: fitting drag from flight data is worth more
 than shaving grams.
 
 Run this at **1,000 cases or more before you quote it**. At 60–200 cases the
-ranking is not just noisier, it is wrong — development runs put `temperature_k`
-third at 0.40, where 1,000 cases settle it at 0.10. Always record the sample
+ranking is not just noisier, it is wrong — on the reference vehicle,
+development runs put `temperature_k` third at 0.40, where 1,000 cases settle it
+far lower (`FLIGHT_DYNAMICS.md` §13.4). Always record the sample
 size and seed next to any sensitivity number you publish.
 
 ## 1.6 Post-flight analysis, before you have a flight
@@ -338,6 +345,11 @@ sections:
     length_in: 26.0
     mass_lb: 7.80
 ```
+
+This and the other mass keys in §2.1–2.6 are how a vehicle file holds masses
+*without* a worksheet (`reference_2026_09.yaml` works this way). With a mass
+worksheet (§2.10) — what `full_scale.yaml` uses — the sections, their lengths
+and every mass come from the worksheet instead, and the yaml leaves them out.
 
 **`mass_lb` is the as-built section mass**: the airframe *plus everything
 permanently inside it* — bulkheads, sled, payload, hardware, fillets, paint. It
@@ -636,6 +648,116 @@ Two blocks have no source in the GUI and are engineering decisions you supply:
 Mark anything you assume. A `# CONFIRM` comment costs nothing and stops an
 assumption being read as data three months later.
 
+## 2.10 The mass worksheet
+
+Once a design has more than a handful of parts, keep its masses in a
+**worksheet** — a CSV in `config/mass/` that opens in Excel — and point the
+vehicle file at it:
+
+```yaml
+mass_properties: full_scale.csv   # in config/mass/
+```
+
+The worksheet then supplies every length, mass and position: the nose cone's,
+each body section's, each transition's, the fins', and the recovery hardware's.
+The yaml keeps only shapes, the motor, parachute sizes and decisions. A value in
+**both** files is an error, not an override — a stale `mass_lb` left in the yaml
+would read as data, and nobody could tell which number flew. Both example
+vehicles (`full_scale.yaml`, `fullscale_model_a.yaml`) work this way; a vehicle
+file with masses typed into the yaml (§2.1–2.6) still works too.
+
+### One row per part
+
+```
+section,component,kind,mass_lb,mass_sigma_pct,length_in,section_front_in,from_section_front_in,position_sigma_in,from_nose_tip_in,moment_lb_in,inertia_pitch_lb_in2,inertia_roll_lb_in2,inertia_sigma_pct,source,note
+Payload Airframe,Payload,tethered,4.500,0,,,8.00,0,32.00,144.000,...,0,CONFIRM,placeholder
+Payload Airframe,Main Parachute,main,2.600,0,,,15.00,0,39.00,101.400,...,0,vendor,
+Payload Airframe,SECTION,,15.800,,36.00,24.00,17.57,,41.57,656.800,...
+```
+
+| Column | You fill in | Meaning |
+|---|---|---|
+| `section` | yes | The tube the part physically sits in. Sections run nose to tail: the nose cone first, then the body tubes, then any transition, which follows the tube above it. |
+| `component` | yes | One thing you can put on a scale. |
+| `kind` | yes | What it counts toward: `structure`, `tethered`, `fins`, `main`, `drogue`, `shock_cord`. A main packed in the payload tube is still `main`. |
+| `mass_lb` | yes | The part's mass. |
+| `from_section_front_in` | yes | The part's CG, measured from the front of **its own** section. Moving a section does not move its parts. |
+| `inertia_pitch_lb_in2`, `inertia_roll_lb_in2` | yes | The part's own inertia about its own CG (below). |
+| `*_sigma_*` | yes | Its uncertainty (below). 0 means exact. |
+| `source` | yes | `weighed`, `cad`, `vendor`, `override`, `ork`, `estimated`, or `CONFIRM`. `CONFIRM` means nobody has stood behind the number yet. |
+| everything else | no | Derived: positions from the nose tip, moments, and the `SECTION` and `AGGREGATE` totals. They are stored so you can follow the arithmetic, and checked rather than trusted. |
+
+A `SECTION` row closes each section with its length; the `AGGREGATE` block at the
+bottom combines the sections into the dry vehicle (no motor, no ballast). The
+motor comes from OpenRocket's database and ballast is a range in the yaml, so
+neither appears here.
+
+A **`tethered`** part — a payload that rides in its tube on the pad but lands on
+its own tether — counts toward its section's flight mass and becomes its own
+piece at landing. Name it in `landing_sections:` by its `component`.
+
+After any edit, run:
+
+```bash
+python scripts/check_mass_csv.py
+```
+
+It recomputes every derived cell and names the line to fix, so a changed mass
+with a stale moment beside it cannot slip through. Excel's "CSV UTF-8" format
+is fine.
+
+### Inertia
+
+The simulation flies the worksheet's inertia, not OpenRocket's. OpenRocket can
+only estimate inertia from component shapes; your CAD knows where the mass
+actually is. Take each part's values from SolidWorks' Mass Properties
+"**taken at the center of mass**", with X along the rocket axis: pitch is `Lyy`
+(average `Lyy` and `Lzz` if they differ) and roll is `Lxx`, in lb·in². The totals
+apply the parallel-axis theorem for you. Until CAD exists, OpenRocket's
+per-component values are a reasonable start — Model A's are — and
+`run_crossvalidate.py` prints the worksheet's totals beside OpenRocket's own
+estimate so you can see how far apart they are.
+
+### The sigma columns
+
+Each part carries its own uncertainty, and every Monte Carlo case draws each
+part independently:
+
+| Column | Draw | Example |
+|---|---|---|
+| `mass_sigma_pct` | mass × (1 + N(0, σ/100)) | `5` = 5% one-sigma |
+| `position_sigma_in` | CG position + N(0, σ) inches | `0.5` |
+| `inertia_sigma_pct` | both inertias × (1 + N(0, σ/100)) | `10` |
+
+Each case then rebuilds the dry mass, CG and inertia from its draws, so a heavy
+payload moves the CG and the inertia together the way real hardware does, and
+the kinetic-energy check of requirement 3.2 uses the pieces that actually flew.
+A single "dry mass ±1.5%" cannot do either. The three totals show up in the
+Monte Carlo input plot and sensitivity table as `mass_lb`, `cg_in` and
+`inertia_pitch_lb_in2`.
+
+**The shipped worksheets have every sigma at 0**, and `run_montecarlo.py` prints
+a banner saying the campaign has no mass dispersion until you change that. A
+campaign without it is not wrong, but its stability and KE probabilities are
+too optimistic, so do not quote one at a review. Choose sigmas from how each
+number was obtained:
+
+| `source` | Reasonable mass σ | Position σ |
+|---|---|---|
+| `weighed` | 1–2% (scale resolution, epoxy still to come) | 0.25 in |
+| `vendor` | 3–5% | 0.5 in |
+| `cad` | 5% | 0.25 in |
+| `ork`, `estimated` | 10% | 1 in |
+| `CONFIRM` | 20–30% | 2 in |
+
+Tighten them as parts are built and weighed; that is the point of carrying them
+per part. To see what mass uncertainty alone does to the flight, disperse it by
+itself (§4.4):
+
+```bash
+python scripts/run_montecarlo.py -n 1000 --only mass_properties
+```
+
 ---
 
 # Part 3 — Launch sites
@@ -710,7 +832,8 @@ Replace each one:
 
 | Parameter | Default σ | How to earn a better number |
 |---|---|---|
-| `dry_mass` | 1.5% | Weigh each section three times; use the observed spread. Then track built-vs-predicted mass all season. |
+| `mass_properties` | per part, in the worksheet (0 as shipped) | §2.10: set each part's sigma from its `source`, and tighten as parts are weighed. |
+| `dry_mass` | 0 | A blanket multiplier on the whole dry mass, on top of the per-part draws. Use it only for a vehicle file with no worksheet, or as an allowance for mass nobody has itemized yet (epoxy, paint, wiring). |
 | `drag_coefficient` | 7% | Compare OpenRocket vs RocketPy, then **fit from flight data** with `fit_cd.py`. Expect 2–3% afterward. |
 | `motor_total_impulse` | 2% | Manufacturer certification data; thrustcurve.org shows lot-to-lot spread. |
 | `wind_speed_mps` | site file | Historical data for the field and month. NOAA/Iowa State Mesonet have archives. |
@@ -718,7 +841,7 @@ Replace each one:
 | `main_deploy_altitude_ft` | 25 ft | Altimeter datasheet accuracy plus bay-porting effects. |
 
 **Cite which version of this file produced any number you put in a report.**
-A reviewer asking "where does 4,440 ft come from" deserves a traceable answer.
+A reviewer asking "where does 5,130 ft come from" deserves a traceable answer.
 
 ## 4.3 Running
 
@@ -915,16 +1038,28 @@ which velocity goes into ½mv²?
   the descent rate, and since energy goes as v², it roughly **doubles** the
   computed energy.
 
-On the template vehicle, at 14.6 fps descent in a 10 mph wind:
+On the template vehicle, at 14.9 fps descent in a 10 mph wind:
 
 | Section | KE (vertical) | KE (with drift) |
 |---|---|---|
-| Nose + Payload Bay | 33.6 ft·lbf | 63.9 ft·lbf |
-| Avionics Bay + Booster | **56.1 ft·lbf** | **106.5 ft·lbf** |
+| Nose Cone | 7.9 ft·lbf | 15.7 ft·lbf |
+| Payload | 15.5 ft·lbf | 30.8 ft·lbf |
+| Payload Airframe | 25.5 ft·lbf | 50.6 ft·lbf |
+| Booster + Boattail | **40.2 ft·lbf** | **79.6 ft·lbf** |
 
-Both pass on the conventional basis. The heavier section would fail on the
+All four pass on the conventional basis. The booster would fail on the
 conservative one. The framework prints both on every KE check so the choice is
 explicit rather than accidental.
+
+The booster is the heaviest piece partly because **the spent motor case lands
+with it** — 4.1 lb of the L1520T's 8.0 lb launch mass. The framework adds the
+case's burnout mass to whichever landing section holds the aft body tube. Leave
+it out of a hand calculation and that section's energy comes out low by
+roughly a third.
+
+In a Monte Carlo campaign, each case uses its own landing masses: the per-part
+mass draws from the worksheet (§2.10), and the motor case scaled by that case's
+`motor_dry_mass` draw.
 
 Sizing to the vertical rate is defensible and conventional. Knowing how little
 margin that leaves is the useful part — and it is a good thing to raise
@@ -1242,9 +1377,23 @@ nominal mass, CG, and motor data from OpenRocket.
 ### `check_plot_inputs.py`
 
 No flags. Flies 20 cases and asserts `plot_inputs.py` regenerates their inputs
-bit-for-bit. Run it after changing `draw_sample`, `run_montecarlo`'s sampling
-loop, or `plot_inputs.py`'s copy of it — those three staying in step is what
-makes the figure trustworthy. Exits non-zero if they diverge.
+bit-for-bit. Both draw through `montecarlo.draw_samples`, so this checks that a
+campaign flies exactly what that function returns. Run it after changing
+`draw_sample`, `draw_samples`, or how `run_montecarlo` hands samples to its
+workers. Exits non-zero if they diverge.
+
+### `check_mass_csv.py`
+
+No flags. Recomputes every derived cell of every worksheet in `config/mass/`,
+checks the mass model the simulation flies against each sheet's totals, and
+checks that per-part draws scatter by the sigmas asked for. Run it after any
+worksheet edit (§2.10). Exits non-zero on any problem.
+
+### `check_landing_partition.py`
+
+No flags. For every vehicle file: the landing sections must account for the
+whole structure exactly once, no piece may weigh zero or less, and the spent
+motor case must land in exactly one piece.
 
 ### `check_against_ork.py`
 

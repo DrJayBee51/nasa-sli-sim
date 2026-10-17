@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from slisim import postflight, report, units as U  # noqa: E402
+from slisim import or_bridge as orb, postflight, report, units as U  # noqa: E402
 from slisim.config import Site, Vehicle  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "output"
@@ -101,8 +101,11 @@ def main() -> int:
 
         main_fps = rates.get("main_fps")
         if main_fps and main_fps == main_fps:  # not NaN
+            case_kg = orb.motor_summary(orb.find_motor(
+                vehicle.motor_search, vehicle.motor_manufacturer,
+                vehicle.motor_mount_inner_radius_m * 2))["burnout_mass_kg"]
             ke = postflight.kinetic_energy_table(
-                vehicle, U.fps_to_mps(main_fps), ballast_kg)
+                vehicle, U.fps_to_mps(main_fps), ballast_kg, case_kg)
             print("KINETIC ENERGY AT LANDING (req 3.2), from measured descent rate:")
             print(report.table(ke, "{:.2f}"))
             print()

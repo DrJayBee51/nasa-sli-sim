@@ -26,7 +26,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from slisim import montecarlo, report  # noqa: E402
@@ -60,16 +59,11 @@ def main() -> int:
     print(f"Sampling {args.samples} draws of {len(unc)} parameters"
           f"  (seed {args.seed}, site {site.key})")
 
-    # The same loop run_montecarlo uses, including the per-case _seed draw that
-    # advances the rng between samples -- omit it and every draw after the first
-    # desynchronizes from the campaign this is meant to reproduce.
-    rng = np.random.default_rng(args.seed)
-    draws = []
-    for _ in range(args.samples):
-        sample = montecarlo.draw_sample(unc, site, rng)
-        rng.integers(0, 2 ** 31 - 1)
-        draws.append(sample)
-    df = pd.DataFrame(draws).add_prefix("in_")
+    # The loop run_montecarlo itself uses, so these are the campaign's draws.
+    draws = montecarlo.draw_samples(unc, site, args.samples, args.seed,
+                                    vehicle, ballast)
+    df = pd.DataFrame([{k: v for k, v in d.items() if not k.startswith("_")}
+                       for d in draws]).add_prefix("in_")
 
     # Nominal mass, CG and motor data come from OpenRocket, so this boots the
     # JVM once (~30 s).  It flies nothing.

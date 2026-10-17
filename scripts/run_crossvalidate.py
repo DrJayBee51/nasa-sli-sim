@@ -94,7 +94,7 @@ def main() -> int:
     or_res = orb.run_simulation(sim, rocket, keep_series=True)
 
     power_on, power_off = rpm.export_drag_curves(or_res)
-    mass_props = rpm.export_mass_properties(rocket, orb.ensure_jvm())
+    mass_props = rpm.mass_properties(vehicle, rocket, orb.ensure_jvm(), ballast)
     rk = rpm.build_rocket(vehicle, motor, mass_props, power_on, power_off)
     flight = rpm.build_flight(rk, rpm.build_environment(site), site)
     rp_res = rpm.extract(flight, rk, motor)
@@ -115,17 +115,37 @@ def main() -> int:
             print(f"        {reason if reason else 'UNEXPLAINED - investigate before citing.'}")
     print()
 
+    # The one mass property the engines do not share: with a worksheet,
+    # RocketPy flies the team's inertia and OpenRocket its own shape-based
+    # estimate.  A large gap is worth knowing before blaming the dynamics.
+    inertia = ""
+    if "or_I_long" in mass_props:
+        lb_in2 = U.kg_to_lb(1.0) / U.in_to_m(1.0) ** 2
+        rows_i = [(label, mass_props[k] * lb_in2, mass_props[f"or_{k}"] * lb_in2)
+                  for label, k in (("Pitch", "I_long"), ("Roll", "I_rot"))]
+        inertia = "\n".join(
+            ["| Dry inertia | Worksheet (RocketPy) | OpenRocket estimate | Diff |",
+             "|---|---|---|---|"]
+            + [f"| {l} | {w:,.1f} lb-in^2 | {o:,.1f} lb-in^2 | {100 * (o - w) / w:+.1f}% |"
+               for l, w, o in rows_i])
+        print("  DRY INERTIA (not shared: worksheet vs OpenRocket's own estimate)")
+        print(inertia)
+        print()
+
     sections = [
         ("What is actually independent",
-         "The two tools share the thrust curve, mass properties, and drag "
+         "The two tools share the thrust curve, the dry mass and CG, and the drag "
          "coefficient curve by construction, so those are *not* independently "
-         "validated. What is independent: the flight dynamics integration "
+         "validated. With a mass worksheet, RocketPy flies the worksheet's "
+         "inertia while OpenRocket uses its own estimate (table below). "
+         "What is independent: the flight dynamics integration "
          "(RocketPy 6-DOF/LSODA vs OpenRocket RK4), each tool's own Barrowman "
          "CP calculation over its own geometry description, the atmosphere and "
          "wind models, and event detection. A claim that the two tools "
          "independently confirm the drag estimate would be false; use "
          "`scripts/fit_cd.py` on real flight data for that."),
         ("Nominal comparison", report.table(cmp_df, "{:.2f}")),
+        *([("Dry inertia", inertia)] if inertia else []),
         ("Discussion of differences",
          "\n".join(
              f"**{r['quantity']}** ({r['percent']:+.1f}%): "

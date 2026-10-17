@@ -13,7 +13,7 @@
 #
 #  *** These sigmas are DEFENSIBLE STARTING POINTS, not measurements. ***
 #  Replace each one with a value the team can justify:
-#    - mass sigmas   -> weigh sections repeatedly, use the observed spread
+#    - mass sigmas   -> per part, in the vehicle's mass worksheet (see below)
 #    - Cd sigma      -> from the OR-vs-RocketPy spread and post-flight Cd fits
 #    - motor sigma   -> manufacturer lot-to-lot data / thrustcurve.org spread
 #    - wind          -> historical data for the site and month
@@ -21,19 +21,25 @@
 # =============================================================================
 
 # --- Vehicle ----------------------------------------------------------------
+mass_properties:
+  # Per-part mass, position and inertia, drawn from the sigma columns of the
+  # vehicle's mass worksheet (config/mass/*.csv).  Each case rebuilds the dry
+  # mass, CG and inertia from its draws, so mass and CG err together the way
+  # real parts do, and req 3.2 checks the pieces that actually flew.
+  # The sigmas live in the worksheet, one per part; this entry only lets
+  # --only / --freeze switch them on and off.  A worksheet of zeros disperses
+  # nothing, and run_montecarlo says so.
+  distribution: worksheet
+
 dry_mass:
-  # Fractional error on total dry mass. 1.5% of ~35 lb is ~0.5 lb, which is a
-  # realistic build tolerance (epoxy, paint, wiring, fillets).
+  # Fractional error on the WHOLE dry mass, on top of the per-part draws.
+  # 0 by default: the worksheet sigmas are the better model.  Use this only
+  # for a vehicle file with no worksheet, or as a blanket allowance for mass
+  # nobody has itemized yet (epoxy, paint, wiring) -- e.g. 0.015 = 1.5%.
   distribution: normal
   relative: true
   mean: 1.0
-  sigma: 0.015
-
-cg_shift:
-  # Absolute shift of the dry CG, meters. Positive = aft. Drives stability.
-  distribution: normal
-  mean: 0.0
-  sigma: 0.010          # +/- 1 cm 1-sigma
+  sigma: 0.0
 
 drag_coefficient:
   # Multiplier on the power-on/off drag curve. This is the single largest

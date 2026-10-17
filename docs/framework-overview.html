@@ -708,18 +708,18 @@
       <span class="arw">→</span>
       <span><b>1,000</b><em>sampled flights</em></span>
       <span class="arw">→</span>
-      <span><b>±196 ft</b><em>apogee, one sigma</em></span>
+      <span><b>±195 ft</b><em>apogee, one sigma</em></span>
       <span class="arw">→</span>
-      <span><b>99.0%</b><em>land inside the window</em></span>
+      <span><b>98.5%</b><em>land inside the window</em></span>
     </div>
 
     <div class="disp">
       <div class="dgroup">
         <h3>The airframe</h3>
+        <div class="drow"><span class="dn">Every part</span><span class="dv">per part</span>
+          <span class="dw">Mass, position and inertia of each part, from the mass worksheet. A weighed part is tight, a guess is wide, and mass and CG move together.</span></div>
         <div class="drow"><span class="dn">Dry mass</span><span class="dv">±1.5%</span>
-          <span class="dw">Epoxy, paint, wiring and fillets never weigh what the CAD said.</span></div>
-        <div class="drow"><span class="dn">CG position</span><span class="dv">±1 cm</span>
-          <span class="dw">Moves with build tolerance and where the payload actually sits.</span></div>
+          <span class="dw">A blanket allowance for epoxy, paint and wiring nobody itemized (used in the figures below).</span></div>
         <div class="drow"><span class="dn">Drag coefficient</span><span class="dv">±7%</span>
           <span class="dw">The big one, and the one we can shrink by flying.</span></div>
       </div>
@@ -765,7 +765,7 @@
 
     <h2 style="font-size:20px;margin:44px 0 6px">What actually moves the needle</h2>
     <p class="note" style="margin-bottom:24px">
-      Rank correlation between each input and each result, over 1,000 flights. Longer bar =
+      Rank correlation between each input and each result, over 1,000 flights of the reference vehicle. Longer bar =
       stronger driver; left of the line means “more of this gives you less of that.”
       <strong>The answer is different for every question we ask</strong> — which is the whole
       reason we run this rather than guessing.
@@ -776,90 +776,90 @@
       <div class="panel">
         <h3>What moves the apogee</h3>
         <p class="sub">Requirement 2.1 &amp; 2.3</p>
-        <div class="srow" title="Motor impulse vs apogee: rho = +0.605">
+        <div class="srow" title="Motor impulse vs apogee: rho = +0.635">
           <span class="slab">Motor impulse</span>
-          <span class="strack"><i class="sbar lead" style="left:50%;width:30.3%"></i></span>
-          <span class="sval">+0.61</span></div>
-        <div class="srow" title="Drag coefficient vs apogee: rho = -0.528">
+          <span class="strack"><i class="sbar lead" style="left:50%;width:31.7%"></i></span>
+          <span class="sval">+0.63</span></div>
+        <div class="srow" title="Drag coefficient vs apogee: rho = -0.486">
           <span class="slab">Drag coefficient</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:26.4%"></i></span>
-          <span class="sval">−0.53</span></div>
-        <div class="srow" title="Dry mass vs apogee: rho = -0.267">
+          <span class="strack"><i class="sbar" style="right:50%;width:24.3%"></i></span>
+          <span class="sval">−0.49</span></div>
+        <div class="srow" title="Dry mass vs apogee: rho = -0.255">
           <span class="slab">Dry mass</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:13.4%"></i></span>
-          <span class="sval">−0.27</span></div>
-        <div class="srow" title="Wind speed vs apogee: rho = -0.226">
+          <span class="strack"><i class="sbar" style="right:50%;width:12.8%"></i></span>
+          <span class="sval">−0.26</span></div>
+        <div class="srow" title="Wind speed vs apogee: rho = -0.218">
           <span class="slab">Wind speed</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:11.3%"></i></span>
-          <span class="sval">−0.23</span></div>
-        <div class="srow" title="Rail angle vs apogee: rho = -0.159">
+          <span class="strack"><i class="sbar" style="right:50%;width:10.9%"></i></span>
+          <span class="sval">−0.22</span></div>
+        <div class="srow" title="Rail angle vs apogee: rho = -0.146">
           <span class="slab">Rail angle</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:8.0%"></i></span>
-          <span class="sval">−0.16</span></div>
-        <div class="srow" title="Air temperature vs apogee: rho = +0.098">
+          <span class="strack"><i class="sbar" style="right:50%;width:7.3%"></i></span>
+          <span class="sval">−0.15</span></div>
+        <div class="srow" title="Air temperature vs apogee: rho = +0.142">
           <span class="slab">Air temperature</span>
-          <span class="strack"><i class="sbar" style="left:50%;width:4.9%"></i></span>
-          <span class="sval">+0.10</span></div>
+          <span class="strack"><i class="sbar" style="left:50%;width:7.1%"></i></span>
+          <span class="sval">+0.14</span></div>
         <div class="saxis"><span></span><span class="ticks"><span>−1</span><span>0</span><span>+1</span></span><span></span></div>
       </div>
 
       <div class="panel">
         <h3>What moves where it lands</h3>
         <p class="sub">Requirement 3.10</p>
-        <div class="srow" title="Rail angle vs drift: rho = +0.829">
+        <div class="srow" title="Rail angle vs drift: rho = +0.823">
           <span class="slab">Rail angle</span>
-          <span class="strack"><i class="sbar lead" style="left:50%;width:41.5%"></i></span>
-          <span class="sval">+0.83</span></div>
-        <div class="srow" title="Rail heading vs drift: rho = -0.085">
-          <span class="slab">Rail heading</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:4.3%"></i></span>
-          <span class="sval">−0.09</span></div>
-        <div class="srow" title="Wind direction vs drift: rho = +0.074">
-          <span class="slab">Wind direction</span>
-          <span class="strack"><i class="sbar" style="left:50%;width:3.7%"></i></span>
-          <span class="sval">+0.07</span></div>
-        <div class="srow" title="Drag coefficient vs drift: rho = -0.059">
+          <span class="strack"><i class="sbar lead" style="left:50%;width:41.1%"></i></span>
+          <span class="sval">+0.82</span></div>
+        <div class="srow" title="Motor impulse vs drift: rho = +0.061">
+          <span class="slab">Motor impulse</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:3.0%"></i></span>
+          <span class="sval">+0.06</span></div>
+        <div class="srow" title="Drogue delay vs drift: rho = +0.058">
+          <span class="slab">Drogue delay</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:2.9%"></i></span>
+          <span class="sval">+0.06</span></div>
+        <div class="srow" title="Drag coefficient vs drift: rho = -0.053">
           <span class="slab">Drag coefficient</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:3.0%"></i></span>
-          <span class="sval">−0.06</span></div>
-        <div class="srow" title="Burn time vs drift: rho = -0.038">
-          <span class="slab">Burn time</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:1.9%"></i></span>
+          <span class="strack"><i class="sbar" style="right:50%;width:2.6%"></i></span>
+          <span class="sval">−0.05</span></div>
+        <div class="srow" title="Main parachute Cd vs drift: rho = -0.036">
+          <span class="slab">Main chute Cd</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:1.8%"></i></span>
           <span class="sval">−0.04</span></div>
-        <div class="srow" title="Main deploy altitude vs drift: rho = +0.037">
-          <span class="slab">Main deploy alt.</span>
-          <span class="strack"><i class="sbar" style="left:50%;width:1.9%"></i></span>
-          <span class="sval">+0.04</span></div>
+        <div class="srow" title="Air temperature vs drift: rho = -0.035">
+          <span class="slab">Air temperature</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:1.8%"></i></span>
+          <span class="sval">−0.04</span></div>
         <div class="saxis"><span></span><span class="ticks"><span>−1</span><span>0</span><span>+1</span></span><span></span></div>
       </div>
 
       <div class="panel">
         <h3>What moves the landing speed</h3>
         <p class="sub">Requirement 3.2 — kinetic energy</p>
-        <div class="srow" title="Main parachute Cd vs landing speed: rho = -0.965">
+        <div class="srow" title="Main parachute Cd vs landing speed: rho = -0.960">
           <span class="slab">Main chute Cd</span>
-          <span class="strack"><i class="sbar lead" style="right:50%;width:48.3%"></i></span>
-          <span class="sval">−0.97</span></div>
-        <div class="srow" title="Air temperature vs landing speed: rho = +0.179">
-          <span class="slab">Air temperature</span>
-          <span class="strack"><i class="sbar" style="left:50%;width:9.0%"></i></span>
-          <span class="sval">+0.18</span></div>
-        <div class="srow" title="Dry mass vs landing speed: rho = +0.108">
+          <span class="strack"><i class="sbar lead" style="right:50%;width:48.0%"></i></span>
+          <span class="sval">−0.96</span></div>
+        <div class="srow" title="Dry mass vs landing speed: rho = +0.144">
           <span class="slab">Dry mass</span>
-          <span class="strack"><i class="sbar" style="left:50%;width:5.4%"></i></span>
-          <span class="sval">+0.11</span></div>
-        <div class="srow" title="Air pressure vs landing speed: rho = -0.105">
+          <span class="strack"><i class="sbar" style="left:50%;width:7.2%"></i></span>
+          <span class="sval">+0.14</span></div>
+        <div class="srow" title="Air temperature vs landing speed: rho = +0.123">
+          <span class="slab">Air temperature</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:6.2%"></i></span>
+          <span class="sval">+0.12</span></div>
+        <div class="srow" title="Air pressure vs landing speed: rho = -0.075">
           <span class="slab">Air pressure</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:5.3%"></i></span>
-          <span class="sval">−0.11</span></div>
-        <div class="srow" title="CG position vs landing speed: rho = -0.077">
-          <span class="slab">CG position</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:3.9%"></i></span>
-          <span class="sval">−0.08</span></div>
-        <div class="srow" title="Drogue Cd vs landing speed: rho = -0.022">
-          <span class="slab">Drogue Cd</span>
-          <span class="strack"><i class="sbar" style="right:50%;width:1.1%"></i></span>
-          <span class="sval">−0.02</span></div>
+          <span class="strack"><i class="sbar" style="right:50%;width:3.7%"></i></span>
+          <span class="sval">−0.07</span></div>
+        <div class="srow" title="Rail angle vs landing speed: rho = +0.053">
+          <span class="slab">Rail angle</span>
+          <span class="strack"><i class="sbar" style="left:50%;width:2.6%"></i></span>
+          <span class="sval">+0.05</span></div>
+        <div class="srow" title="Motor impulse vs landing speed: rho = -0.047">
+          <span class="slab">Motor impulse</span>
+          <span class="strack"><i class="sbar" style="right:50%;width:2.4%"></i></span>
+          <span class="sval">−0.05</span></div>
         <div class="saxis"><span></span><span class="ticks"><span>−1</span><span>0</span><span>+1</span></span><span></span></div>
       </div>
     </div>
@@ -883,7 +883,7 @@
     <div class="outs">
       <div class="out">
         <h3>An apogee we can defend</h3>
-        <p>Not “4,534 ft” but “4,440 ft, with 95% of cases between 4,068 and 4,818.”
+        <p>Not “4,534 ft” but “4,440 ft, with 95% of cases between 4,044 and 4,816.”
            The number we declare at CDR is the center of that spread.</p>
         <div class="answers">ANSWERS REQ 2.1 · REQ 2.3</div>
       </div>

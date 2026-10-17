@@ -75,7 +75,7 @@ def main() -> int:
 
         if not args.skip_rocketpy:
             power_on, power_off = rpm.export_drag_curves(or_res)
-            mass_props = rpm.export_mass_properties(rocket, orb.ensure_jvm())
+            mass_props = rpm.mass_properties(vehicle, rocket, orb.ensure_jvm(), ballast)
             env = rpm.build_environment(site)
             rk = rpm.build_rocket(vehicle, motor, mass_props, power_on, power_off)
             rp_res = rpm.extract(rpm.build_flight(rk, env, site), rk, motor)

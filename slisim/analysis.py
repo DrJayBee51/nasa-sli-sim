@@ -15,6 +15,7 @@ import pandas as pd
 from . import requirements as rq
 from . import units as U
 from .config import Vehicle
+from .montecarlo import LANDING_PREFIX
 
 
 # ---------------------------------------------------------------------------
@@ -90,10 +91,13 @@ def compliance(df: pd.DataFrame, vehicle: Vehicle, motor: dict,
     add("3.11", "Descent time <= 100 s",
         ok["descent_time_s"] <= rq.MAX_DESCENT_S, ok["descent_time_s"], "<= 100 s")
 
-    # Kinetic energy, per independent section (req 3.2).
+    # Kinetic energy, per independent section (req 3.2).  Each case's own
+    # landing masses when the campaign drew them, else the nominal.
     if "landing_vertical_fps" in ok.columns:
         v_mps = ok["landing_vertical_fps"] / U.FT_PER_M
-        for name, mass in vehicle.landing_section_masses_kg(ballast_kg).items():
+        for name, mass in vehicle.landing_section_masses_kg(
+                ballast_kg, motor_case_kg=motor["burnout_mass_kg"]).items():
+            mass = ok.get(f"{LANDING_PREFIX}{name}", mass)
             ke = 0.5 * mass * v_mps ** 2 / U.J_PER_FTLBF
             add("3.2", f"KE <= 75 ft-lbf: {name}",
                 ke <= rq.MAX_KE_FTLBF, ke, "<= 75 ft-lbf")

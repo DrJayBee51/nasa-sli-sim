@@ -16,7 +16,10 @@ That is only an honest claim if you know which parts differ.  Here:
 
   Shared on purpose (so the comparison isolates the dynamics)
     * the thrust curve, exported from OpenRocket's bundled motor database
-    * the mass, CG, and inertia, taken from OpenRocket's mass calculator
+    * the mass and CG -- from the vehicle's mass worksheet, which builds the
+      OpenRocket model too (or OpenRocket's mass calculator, without one)
+    * the inertia, from the worksheet when there is one; OpenRocket then
+      flies its own shape-based estimate, and run_crossvalidate prints both
     * the drag coefficient curve Cd(Mach)
 
 The drag curve is shared because RocketPy has no parasitic-drag model of its
@@ -113,6 +116,46 @@ def export_mass_properties(rocket, or_module) -> dict[str, float]:
         "cg_from_nose_m": float(body.getCM().x),
         "I_long": float(body.getLongitudinalInertia()),
         "I_rot": float(body.getRotationalInertia()),
+    }
+
+
+def mass_properties(vehicle, rocket, or_module,
+                    ballast_kg: float = 0.0) -> dict[str, float]:
+    """The nominal structure mass, CG and inertia RocketPy flies.
+
+    A vehicle with a mass worksheet flies the sheet's numbers -- its inertia
+    is the team's (CAD or weighed), which OpenRocket can only estimate from
+    shapes.  A vehicle without a sheet flies OpenRocket's.  Monte Carlo draws
+    go through from_state instead.
+
+    The sheet and OpenRocket are built from the same numbers, so their mass
+    and CG must agree; a disagreement means one of them is not reading what
+    the other is, and every result downstream would be quietly inconsistent.
+    """
+    orp = export_mass_properties(rocket, or_module)
+    if vehicle.mass_sheet is None:
+        return orp
+    from . import massprops
+
+    sheet, _ = massprops.read(vehicle.mass_sheet)
+    nominal = massprops.state(sheet, None, U.kg_to_lb(ballast_kg),
+                              vehicle.ballast_location)
+    d_lb = U.kg_to_lb(orp["mass_kg"]) - nominal["mass_lb"]
+    d_in = U.m_to_in(orp["cg_from_nose_m"]) - nominal["cg_in"]
+    if abs(d_lb) > 0.01 or abs(d_in) > 0.05:
+        print(f"  WARNING: {vehicle.mass_sheet.name} and OpenRocket disagree: "
+              f"mass {d_lb:+.3f} lb, CG {d_in:+.2f} in (OpenRocket - sheet)")
+    return {**from_state(nominal), "or_I_long": orp["I_long"], "or_I_rot": orp["I_rot"]}
+
+
+def from_state(state: dict) -> dict[str, float]:
+    """massprops.state (lb, in) as build_rocket's SI mass_props."""
+    in2 = U.in_to_m(1.0) ** 2
+    return {
+        "mass_kg": U.lb_to_kg(state["mass_lb"]),
+        "cg_from_nose_m": U.in_to_m(state["cg_in"]),
+        "I_long": U.lb_to_kg(state["inertia_pitch"]) * in2,
+        "I_rot": U.lb_to_kg(state["inertia_roll"]) * in2,
     }
 
 
@@ -255,17 +298,23 @@ def build_motor(vehicle: Vehicle, or_motor, scale_impulse: float = 1.0,
     dry_mass = float(or_motor.getBurnoutMass()) * scale_dry_mass
     radius = float(or_motor.getDiameter()) / 2.0
     length = float(or_motor.getLength())
+    # The motor's CG from the database, as an offset from its midpoint (the
+    # origin here; positive toward the forward closure).  A reload is rarely
+    # balanced at its middle -- the K1800ST's CG is 1.8 in aft of it -- and
+    # centring 6 lb of motor there would put RocketPy's CG 0.4 in forward of
+    # OpenRocket's, a tenth of a caliber of stability that does not exist.
+    cg = length / 2.0 - float(or_motor.getLaunchCGx())
 
     return GenericMotor(
         thrust_source=curve,
         burn_time=burn_time,
         chamber_radius=radius * 0.95,
         chamber_height=length * 0.85,
-        chamber_position=0.0,           # relative to the motor's own origin
+        chamber_position=cg,            # relative to the motor's own origin
         propellant_initial_mass=prop_mass,
         nozzle_radius=radius * 0.6,
         dry_mass=dry_mass,
-        center_of_dry_mass_position=0.0,
+        center_of_dry_mass_position=cg,
         nozzle_position=-length / 2.0,
         coordinate_system_orientation="nozzle_to_combustion_chamber",
     )
@@ -273,7 +322,7 @@ def build_motor(vehicle: Vehicle, or_motor, scale_impulse: float = 1.0,
 
 def build_rocket(vehicle: Vehicle, or_motor, mass_props: dict[str, float],
                  power_on_drag, power_off_drag,
-                 dry_mass_scale: float = 1.0, cg_shift_m: float = 0.0,
+                 dry_mass_scale: float = 1.0,
                  drag_scale: float = 1.0, drogue_cd_scale: float = 1.0,
                  main_cd_scale: float = 1.0, main_deploy_shift_m: float = 0.0,
                  drogue_delay_shift_s: float = 0.0,
@@ -308,10 +357,12 @@ def build_rocket(vehicle: Vehicle, or_motor, mass_props: dict[str, float],
     rocket = Rocket(
         radius=vehicle.outer_radius_m,
         mass=mass_props["mass_kg"] * dry_mass_scale,
-        inertia=(mass_props["I_long"], mass_props["I_long"], mass_props["I_rot"]),
+        inertia=(mass_props["I_long"] * dry_mass_scale,
+                 mass_props["I_long"] * dry_mass_scale,
+                 mass_props["I_rot"] * dry_mass_scale),
         power_off_drag=scaled(power_off_drag, drag_scale),
         power_on_drag=scaled(power_on_drag, drag_scale),
-        center_of_mass_without_motor=mass_props["cg_from_nose_m"] + cg_shift_m,
+        center_of_mass_without_motor=mass_props["cg_from_nose_m"],
         coordinate_system_orientation="nose_to_tail",
     )
 

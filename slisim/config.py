@@ -124,6 +124,16 @@ def _vehicle_type(d: dict, path: Path) -> str:
     return vt
 
 
+def mass_sheet_path(d: dict, path: Path) -> Path:
+    """The worksheet a vehicle file's `mass_properties:` names."""
+    ref = Path(d["mass_properties"])
+    sheet_path = ref if ref.is_absolute() or ref.exists() else CONFIG_DIR / "mass" / ref
+    if not sheet_path.is_file():
+        raise FileNotFoundError(f"{path.name}: mass_properties {ref} not found "
+                                f"(looked in {CONFIG_DIR / 'mass'})")
+    return sheet_path
+
+
 def _apply_mass_sheet(d: dict, path: Path) -> dict:
     """Fill lengths, masses and positions in from the vehicle's worksheet.
 
@@ -137,11 +147,7 @@ def _apply_mass_sheet(d: dict, path: Path) -> dict:
     """
     from . import massprops
 
-    ref = Path(d["mass_properties"])
-    sheet_path = ref if ref.is_absolute() or ref.exists() else CONFIG_DIR / "mass" / ref
-    if not sheet_path.is_file():
-        raise FileNotFoundError(f"{path.name}: mass_properties {ref} not found "
-                                f"(looked in {CONFIG_DIR / 'mass'})")
+    sheet_path = mass_sheet_path(d, path)
     sheet, problems = massprops.read(sheet_path)
     if problems:
         raise ValueError(f"{sheet_path.name} has {len(problems)} problem(s); run "
@@ -329,6 +335,10 @@ class Vehicle:
     ballast_max_kg: float
     ballast_location: str
 
+    # The mass worksheet, when the vehicle file names one.  Monte Carlo draws
+    # per-part dispersions from it; without one, only `dry_mass` disperses.
+    mass_sheet: Path | None = None
+
     # ------------------------------------------------------------------
     @classmethod
     def from_yaml(cls, path: str | Path | None = None) -> "Vehicle":
@@ -483,6 +493,7 @@ class Vehicle:
             ballast_min_kg=U.lb_to_kg(float(ba.get("min_lb", 0.0))),
             ballast_max_kg=U.lb_to_kg(float(ba.get("max_lb", 0.0))),
             ballast_location=ba.get("location", sections[0].name if sections else ""),
+            mass_sheet=mass_sheet_path(d, path) if d.get("mass_properties") else None,
         )
 
     # --- derived geometry ---------------------------------------------
@@ -568,12 +579,33 @@ class Vehicle:
         """Basis for the req 2.20.7 limit (ballast <= 10% of un-ballasted mass)."""
         return self.dry_mass_kg(0.0)
 
-    def landing_section_masses_kg(self, ballast_kg: float = 0.0) -> dict[str, float]:
+    def landing_section_masses_kg(self, ballast_kg: float = 0.0,
+                                  member_masses: dict[str, float] | None = None,
+                                  motor_case_kg: float = 0.0) -> dict[str, float]:
         """Mass of each independent section as it lands (req 3.2).
 
         Parachutes and shock cord are excluded: the FRR instructs teams to
         subtract them, since they hang outside the airframe on landing.
+
+        `motor_case_kg` is the spent motor -- its burnout mass -- which lands
+        in whichever piece holds the aft body tube, where the mount is.  Leave
+        it out and that piece's kinetic energy is under-predicted by the whole
+        case, often more than the airframe around it weighs.
+
+        `member_masses` (kg, ballast already included) replaces the nominal
+        values with one Monte Carlo draw -- see massprops.state.
         """
+        if member_masses is None:
+            member_masses = self._member_masses_kg(ballast_kg)
+        if motor_case_kg and self.sections:
+            mount = self.sections[-1].name
+            member_masses = {**member_masses,
+                             mount: member_masses.get(mount, 0.0) + motor_case_kg}
+        return {ls["name"]: sum(member_masses.get(m, 0.0) for m in ls["members"])
+                for ls in self.landing_sections}
+
+    def _member_masses_kg(self, ballast_kg: float) -> dict[str, float]:
+        """Nominal mass of every landing member, by the name landing_sections uses."""
         by_member = {"nose_cone": self.nose_mass_kg, "fins": self.fin_mass_kg}
         for s in self.sections:
             by_member[s.name] = s.mass_kg
@@ -587,11 +619,7 @@ class Vehicle:
         if ballast_kg:
             loc = self.ballast_location
             by_member[loc] = by_member.get(loc, 0.0) + ballast_kg
-
-        return {
-            ls["name"]: sum(by_member.get(m, 0.0) for m in ls["members"])
-            for ls in self.landing_sections
-        }
+        return by_member
 
     def unassigned_members(self) -> list[str]:
         """Named masses not claimed by any landing section (a spec bug)."""

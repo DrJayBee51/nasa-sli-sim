@@ -24,8 +24,16 @@ from typing import Any, Iterator
 import numpy as np
 import pandas as pd
 
+from . import massprops
 from . import units as U
 from .config import Site, Vehicle, load_uncertainty
+
+#  The uncertainty.yaml entry whose sigmas live in the mass worksheet, one per
+#  part, rather than in the yaml.  It draws nothing from the shared stream.
+WORKSHEET = "worksheet"
+
+#  Result columns holding one case's landing-piece masses (kg), for req 3.2.
+LANDING_PREFIX = "landing_kg:"
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +101,9 @@ def _freeze_spec(spec: dict) -> dict:
     seed.
     """
     out = dict(spec)
-    if out.get("distribution", "normal") == "uniform":
+    if out.get("distribution") == WORKSHEET:
+        out["frozen"] = True
+    elif out.get("distribution", "normal") == "uniform":
         # No mean to fall back on: the midpoint is the only neutral choice.
         out["low"] = out["high"] = 0.5 * (float(out["low"]) + float(out["high"]))
     else:
@@ -132,11 +142,20 @@ def select_parameters(unc: dict, only: list[str] | None = None,
     return {k: (_freeze_spec(v) if k in frozen else v) for k, v in unc.items()}
 
 
-def dispersed_parameters(unc: dict) -> list[str]:
-    """Names still carrying spread, in file order."""
+def dispersed_parameters(unc: dict, vehicle: Vehicle | None = None) -> list[str]:
+    """Names still carrying spread, in file order.
+
+    The worksheet entry counts only when the vehicle's sheet has a nonzero
+    sigma somewhere -- a sheet of zeros disperses nothing, whatever the yaml says.
+    """
     out = []
     for key, spec in unc.items():
-        if spec.get("distribution", "normal") == "uniform":
+        if spec.get("distribution") == WORKSHEET:
+            if not spec.get("frozen") and vehicle is not None and vehicle.mass_sheet:
+                sheet, _ = massprops.read(vehicle.mass_sheet)
+                if sheet is not None and massprops.has_dispersion(sheet):
+                    out.append(key)
+        elif spec.get("distribution", "normal") == "uniform":
             if float(spec["low"]) != float(spec["high"]):
                 out.append(key)
         elif spec.get("sigma", 0.0) != 0.0:
@@ -159,8 +178,46 @@ def draw_sample(unc: dict, site: Site, rng: np.random.Generator) -> dict[str, fl
     }
     out: dict[str, float] = {}
     for key, spec in unc.items():
-        out[key] = _draw_one(spec, rng, site_means.get(key), site_sigmas.get(key))
+        if spec.get("distribution") != WORKSHEET:
+            out[key] = _draw_one(spec, rng, site_means.get(key), site_sigmas.get(key))
     return out
+
+
+def draw_samples(unc: dict, site: Site, n: int, seed: int,
+                 vehicle: Vehicle | None = None,
+                 ballast_kg: float = 0.0) -> list[dict]:
+    """Every case's perturbations: the one sampling loop.
+
+    run_montecarlo flies these and plot_inputs plots them, so both see the
+    identical draws for a given seed.
+
+    Per-part mass draws use their own generator, seeded from the case's
+    `_seed`, so adding a part to the worksheet does not reshuffle the wind or
+    the motor of every case after it.  Each case records the resulting total
+    mass, CG and pitch inertia (as inputs, so they reach the sensitivity
+    table) and carries the full draw in `_state` for the flight and for req 3.2.
+    """
+    sheet = None
+    if vehicle is not None and vehicle.mass_sheet is not None:
+        sheet, _ = massprops.read(vehicle.mass_sheet)
+    spec = next((v for v in unc.values() if v.get("distribution") == WORKSHEET), None)
+    disperse = spec is not None and not spec.get("frozen")
+
+    rng = np.random.default_rng(seed)
+    samples = []
+    for _ in range(n):
+        s = draw_sample(unc, site, rng)
+        s["_seed"] = int(rng.integers(0, 2 ** 31 - 1))
+        if sheet is not None:
+            st = massprops.state(
+                sheet, np.random.default_rng(s["_seed"]) if disperse else None,
+                U.kg_to_lb(ballast_kg), vehicle.ballast_location)
+            s["mass_lb"] = st["mass_lb"]
+            s["cg_in"] = st["cg_in"]
+            s["inertia_pitch_lb_in2"] = st["inertia_pitch"]
+            s["_state"] = st
+        samples.append(s)
+    return samples
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +253,7 @@ def _prepare(vehicle: Vehicle, site: Site, ballast_kg: float) -> dict[str, Any]:
         "rocket": rocket,
         "motor": motor,
         "motor_info": orb.motor_summary(motor),
-        "mass_props": rpm.export_mass_properties(rocket, orb.ensure_jvm()),
+        "mass_props": rpm.mass_properties(vehicle, rocket, orb.ensure_jvm(), ballast_kg),
         "power_on": power_on,
         "power_off": power_off,
         "nominal": nominal,
@@ -208,7 +265,7 @@ def _prepare(vehicle: Vehicle, site: Site, ballast_kg: float) -> dict[str, Any]:
 def nominal_values(vehicle: Vehicle, site: Site, ballast_kg: float) -> dict[str, float]:
     """The nominal each relative/shift parameter perturbs, in the sample's own units.
 
-    A sample records what was *drawn* -- 1.0169 for dry_mass, -0.4 for cg_shift --
+    A sample records what was *drawn* -- 1.0169 for dry_mass, 0.98 for main_cd --
     which says nothing about the quantity itself.  Pairing each draw with the
     value it multiplies or shifts is what lets a figure report pounds and inches
     instead of "x nominal".
@@ -222,7 +279,6 @@ def nominal_values(vehicle: Vehicle, site: Site, ballast_kg: float) -> dict[str,
     return {
         # Exactly the quantities rocketpy_model.build_rocket scales or shifts.
         "dry_mass": mp["mass_kg"],
-        "cg_shift": mp["cg_from_nose_m"],
         "motor_total_impulse": float(mi["total_impulse_ns"]),
         "motor_burn_time": float(mi["burn_time_s"]),
         "motor_dry_mass": float(mi["burnout_mass_kg"]),
@@ -252,13 +308,14 @@ def run_rocketpy_case(vehicle: Vehicle, site: Site, sample: dict[str, float],
 
     prep = _prepare(vehicle, site, ballast_kg)
     ov = _overrides_from(sample)
+    st = sample.get("_state")
 
     env = rpm.build_environment(site, ov)
     rocket = rpm.build_rocket(
-        vehicle, prep["motor"], prep["mass_props"],
+        vehicle, prep["motor"],
+        rpm.from_state(st) if st else prep["mass_props"],
         prep["power_on"], prep["power_off"],
         dry_mass_scale=sample.get("dry_mass", 1.0),
-        cg_shift_m=sample.get("cg_shift", 0.0),
         drag_scale=sample.get("drag_coefficient", 1.0),
         drogue_cd_scale=sample.get("drogue_cd", 1.0),
         main_cd_scale=sample.get("main_cd", 1.0),
@@ -269,7 +326,17 @@ def run_rocketpy_case(vehicle: Vehicle, site: Site, sample: dict[str, float],
         motor_dry_mass_scale=sample.get("motor_dry_mass", 1.0),
     )
     flight = rpm.build_flight(rocket, env, site, ov)
-    return rpm.extract(flight, rocket, prep["motor"], keep_series=False).to_row()
+    row = rpm.extract(flight, rocket, prep["motor"], keep_series=False).to_row()
+    if st:
+        # The pieces that landed are the pieces that flew: req 3.2 uses this
+        # case's draw, scaled with the rest of the dry mass.
+        k = sample.get("dry_mass", 1.0)
+        members = {m: U.lb_to_kg(v) * k for m, v in st["members"].items()}
+        case_kg = prep["motor_info"]["burnout_mass_kg"] * sample.get("motor_dry_mass", 1.0)
+        for name, kg in vehicle.landing_section_masses_kg(
+                member_masses=members, motor_case_kg=case_kg).items():
+            row[f"{LANDING_PREFIX}{name}"] = kg
+    return row
 
 
 def run_openrocket_case(vehicle: Vehicle, site: Site, sample: dict[str, float],
@@ -327,13 +394,7 @@ def run_montecarlo(vehicle: Vehicle, site: Site, n: int = 500,
     """
     unc = uncertainty if uncertainty is not None else load_uncertainty()
     unc = select_parameters(unc, only, freeze)
-    rng = np.random.default_rng(seed)
-
-    samples = []
-    for i in range(n):
-        s = draw_sample(unc, site, rng)
-        s["_seed"] = int(rng.integers(0, 2 ** 31 - 1))
-        samples.append(s)
+    samples = draw_samples(unc, site, n, seed, vehicle, ballast_kg)
 
     workers = workers or max(1, min(os.cpu_count() or 1, 8))
     tasks = [(vehicle, site, s, ballast_kg, engine, i) for i, s in enumerate(samples)]
@@ -354,7 +415,7 @@ def run_montecarlo(vehicle: Vehicle, site: Site, n: int = 500,
 
     df = pd.DataFrame(rows).sort_values("index").reset_index(drop=True)
     df.attrs["engine"] = engine
-    df.attrs["dispersed"] = dispersed_parameters(unc)
+    df.attrs["dispersed"] = dispersed_parameters(unc, vehicle)
     df.attrs["seed"] = seed
     df.attrs["n"] = n
     df.attrs["ballast_kg"] = ballast_kg

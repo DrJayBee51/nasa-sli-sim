@@ -49,7 +49,7 @@ estimate is wrong. What RocketPy independently validates is everything the drag
 To break that last dependency, fit Cd against real flight data
 (`scripts/fit_cd.py`). That is also the single highest-value analysis here:
 drag and motor impulse are the two dominant drivers of apogee scatter (Spearman
-ρ ≈ −0.53 and +0.61 over 1,000 cases). Motor scatter is fixed at the factory;
+ρ ≈ −0.63 and +0.53 over 1,000 cases on the template vehicle). Motor scatter is fixed at the factory;
 drag is the one of the two a team can actually shrink, so replacing the
 pre-flight guess with a measured value substantially tightens the predicted
 apogee — which is exactly what the req 2.3 altitude score pays out on.
@@ -291,18 +291,30 @@ belongs in the Monte Carlo, where the seed genuinely controls the outcome.
 
 ## Status of the template vehicle
 
-`config/vehicles/full_scale.yaml` is a **placeholder**, not a design — a representative
-6", ~40 lb, L1520T-powered vehicle that lands mid-window and passes every
-requirement, so the framework can be exercised before the real design exists.
-Replace the numbers as the 2026–2027 design matures. The `status:` field in that
-file should stop saying `PLACEHOLDER` once it describes something real.
+`config/vehicles/full_scale.yaml` and its worksheet `config/mass/full_scale.csv`
+are a **placeholder**, not a design — a representative 6", 33.6 lb,
+L1520T-powered vehicle laid out like the team's architecture (nose, payload
+airframe with a tethered payload, booster, boat tail, four pieces at landing).
+It passes every requirement so the framework can be exercised before the real
+design exists. Replace the numbers as the 2026–2027 design matures. The
+`status:` field should stop saying `PLACEHOLDER` once it describes something
+real.
 
-Nominal template performance: **4,534 ft** apogee (OpenRocket) / **4,537 ft**
-(RocketPy), 2.18 cal stability, 8.1:1 thrust-to-weight, 78 fps rail exit,
-Mach 0.54, 77 s descent, 1,355 ft drift. 15 pass / 1 warn / 0 fail — the warn is
-the mass score (39.6 lb loaded scores 3 of 5 points; a 4" airframe would score 5
-but leaves less room for the rover payload). That tension is real and worth an
-early decision.
+Nominal template performance: **5,263 ft** apogee (OpenRocket) / **5,266 ft**
+(RocketPy), 2.36 cal stability, 10.0:1 thrust-to-weight, 89 fps rail exit,
+Mach 0.64, 88 s descent, 1,468 ft drift, heaviest landing piece 40 ft·lbf.
+17 pass / 1 warn / 0 fail — the warn is req 2.3, because a single nominal run
+does not land on the declared target; the target is the Monte Carlo median
+(5,130 ft), which is the right thing to declare.
+
+Two other vehicle files ship alongside it: `fullscale_model_a.yaml`, the team's
+first full-scale design transcribed from its `.ork`, and
+`reference_2026_09.yaml`, the earlier template frozen so the worked examples in
+`docs/FLIGHT_DYNAMICS.md` stay reproducible.
+
+The shipped mass worksheets carry **zero sigmas**, so a Monte Carlo campaign
+disperses no mass until the team fills them in; `run_montecarlo.py` says so in
+a banner. See USER_GUIDE §2.10.
 
 The `uncertainty.yaml` sigmas are **defensible starting points, not
 measurements**. Replace each with something the team can justify — weigh

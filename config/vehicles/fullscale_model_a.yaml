@@ -85,11 +85,9 @@ motor:
   #  mount's mass is overridden to zero, so only the MOTOR's station affects CG,
   #  and overhang moves the motor aft of the mount by exactly that 1.0 in.
   #  Without this the motor's 6.1 lb sits an inch too far forward and the model
-  #  reads 2.27 caliber against the .ork's 2.25 -- margin the vehicle does not
-  #  have, on a scored requirement.  With it, 2.23: still 0.02 off, but low
-  #  rather than high.  Do not tune this to zero the error; 1.0 in is the
-  #  measured geometry, and the remainder is the boattail mass sitting at its
-  #  midpoint (the schema carries no CG for a transition) plus rounding.
+  #  reads more margin than the .ork's 2.25 caliber -- margin the vehicle does
+  #  not have, on a scored requirement.  With it, the model reads 2.25.  Do not
+  #  tune this; 1.0 in is the measured geometry.
   overhang_in: 1.0
   ignition_delay_s: 0.0
 

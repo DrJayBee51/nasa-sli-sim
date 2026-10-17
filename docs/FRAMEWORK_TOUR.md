@@ -76,7 +76,8 @@ requirement check? Which would you *not*?
 
 ## Stop 1 — One file, two models
 
-**Read:** `config/vehicles/full_scale.yaml`, then in `config.py` the methods
+**Read:** `config/vehicles/full_scale.yaml` and the worksheet it names,
+`config/mass/full_scale.csv`, then in `config.py` the methods
 `landing_section_masses_kg`, `recovery_mass_kg`, and `unassigned_members`.
 Then read `check_mass_closure` in `requirements.py`.
 
@@ -93,12 +94,14 @@ python scripts/run_nominal.py
 
 Find the `FRR-V  Mass budget closure` line. It should read `0.00 lb`.
 
-**Predict, then change:** in `vehicle.yaml`, remove `"fins"` from the members
-of the second landing section. Does anything fail? What is reported, and by
-which check?
+**Predict, then change:** in `full_scale.yaml`, remove `"fins"` from the
+members of the `Booster + Boattail` landing section. Does anything fail? What
+is reported, and by which check?
 
-Put it back, then try instead adding 0.5 lb to the Payload Bay section mass and
-re-run. Which numbers moved, and why did the mass budget still close?
+Put it back, then try instead adding 0.5 lb to the `AV Bay` row of the
+worksheet. Run `python scripts/check_mass_csv.py` first and correct the cells
+it names — the moment beside the mass, and every total below it — then re-run.
+Which numbers moved, and why did the mass budget still close?
 
 **Answer this:** the `landing_sections` block does not describe any physical
 part of the rocket. Why does the framework need it, and which requirement is
@@ -178,9 +181,11 @@ survive all the way into an FRR?
 A single simulation answers "what happens if everything is nominal", which is
 the one case that never occurs.
 
-**Read:** `draw_sample` and `_draw_one` in `montecarlo.py`, then `compliance`
-and `sensitivity` in `analysis.py`. Note that sampled *inputs* are stored in
-each row with an `in_` prefix, which is how `sensitivity` finds them.
+**Read:** `draw_samples`, `draw_sample` and `_draw_one` in `montecarlo.py`,
+then `compliance` and `sensitivity` in `analysis.py`. Note that sampled
+*inputs* are stored in each row with an `in_` prefix, which is how
+`sensitivity` finds them — including the dry mass, CG and inertia that
+`draw_samples` rebuilds from the mass worksheet's per-part draws.
 
 **Run:**
 

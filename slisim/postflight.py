@@ -181,7 +181,7 @@ def fit_cd_scale(vehicle: Vehicle, site: Site, measured: FlightData,
     baseline = orb.run_simulation(orb.make_simulation(doc, rocket, site, ov),
                                   rocket, keep_series=True)
     power_on, power_off = rpm.export_drag_curves(baseline)
-    mass_props = rpm.export_mass_properties(rocket, orb.ensure_jvm())
+    mass_props = rpm.mass_properties(vehicle, rocket, orb.ensure_jvm(), ballast_kg)
 
     calls = {"n": 0}
 
@@ -273,10 +273,15 @@ def measured_descent_rates(measured: FlightData,
 
 
 def kinetic_energy_table(vehicle: Vehicle, descent_rate_mps: float,
-                         ballast_kg: float = 0.0) -> pd.DataFrame:
-    """The FRR kinetic-energy table, per independent section."""
+                         ballast_kg: float = 0.0,
+                         motor_case_kg: float = 0.0) -> pd.DataFrame:
+    """The FRR kinetic-energy table, per independent section.
+
+    `motor_case_kg` is the spent motor, which lands with the mount's section.
+    """
     rows = []
-    for name, mass in vehicle.landing_section_masses_kg(ballast_kg).items():
+    for name, mass in vehicle.landing_section_masses_kg(
+            ballast_kg, motor_case_kg=motor_case_kg).items():
         ke = 0.5 * mass * descent_rate_mps ** 2 / U.J_PER_FTLBF
         rows.append({
             "section": name,

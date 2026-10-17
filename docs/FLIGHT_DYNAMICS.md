@@ -15,9 +15,11 @@ read the working equations alone as a reference during a report crunch, or read
 the derivations to understand where they come from.
 
 Numbers labeled *"template vehicle"* are real outputs from the framework for
-the placeholder design in `config/vehicles/full_scale.yaml` (6.00 in diameter,
-103 in long,
-39.58 lb on the pad, AeroTech L1520T). They are there so you can check your own
+the frozen reference design in `config/vehicles/reference_2026_09.yaml` — the
+template as it stood in September 2026 (6.00 in diameter, 103 in long,
+39.58 lb on the pad, AeroTech L1520T). The current placeholder in
+`full_scale.yaml` has since changed; the reference does not, so these numbers
+stay reproducible with `--vehicle config/vehicles/reference_2026_09.yaml`. They are there so you can check your own
 understanding against something concrete, and so you can reproduce them.
 
 Statements about OpenRocket's internals were verified directly against
@@ -111,7 +113,7 @@ Every aerodynamic force scales with $\rho$. Apogee is roughly set by how much
 kinetic energy survives the drag integral $\int C_D \tfrac12 \rho V^2 A\,dx$, so
 a 5% density error is roughly a 5% drag error. The framework's sensitivity
 analysis picks this up directly: launch-day **temperature** registers a
-measurable pull on apogee (Spearman ρ ≈ +0.10 over 1,000 cases) purely
+measurable pull on apogee (Spearman ρ ≈ +0.14 over 1,000 cases) purely
 through its effect on density, with no other path to the trajectory.
 
 ## 2.2 Working equations — the ISA troposphere
@@ -365,7 +367,7 @@ fin planform area.
 **This is a genuinely independent aerodynamic model, not a re-implementation of
 Barrowman.** It is the strongest part of the cross-validation claim: two
 different fin theories, applied to the same geometry, agreeing on static margin
-to 0.01 caliber (2.18 vs 2.19 for the template) is real evidence.
+to within 0.01 caliber (2.18 in both, for the template) is real evidence.
 
 ## 4.4 CP moves with Mach
 
@@ -401,8 +403,8 @@ a reviewer asks.
 # 5. Drag
 
 Drag sets apogee, and drag uncertainty is — alongside motor impulse — one of
-the two dominant contributors to apogee scatter (Spearman ρ ≈ −0.53, against
-motor impulse's +0.61). It is the one of the two a team can actually reduce,
+the two dominant contributors to apogee scatter (Spearman ρ ≈ −0.49, against
+motor impulse's +0.64). It is the one of the two a team can actually reduce,
 which is why it deserves the attention.
 
 ## 5.1 Decomposition
@@ -970,8 +972,13 @@ Template vehicle:
 
 | Section | Mass | $KE$ (vertical, 14.6 fps) | $KE$ (total, 20.7 fps) |
 |---|---:|---:|---:|
-| Nose + Payload Bay | 10.20 lb | 33.6 ft·lbf | 63.9 ft·lbf |
-| Avionics Bay + Booster | 17.00 lb | **56.1 ft·lbf** | **106.5 ft·lbf** |
+| Nose + Payload Bay | 10.20 lb | 33.6 ft·lbf | 68.2 ft·lbf |
+| Avionics Bay + Booster | 21.07 lb | **69.5 ft·lbf** | **140.9 ft·lbf** |
+
+The booster's 21.07 lb is its 17.00 lb of airframe **plus the 4.07 lb spent
+motor case**, which stays in the mount and lands with it. The case is easy to
+forget — it is not part of any section's as-built mass — and forgetting it here
+would understate this section's energy by a fifth.
 
 The handbook's FRR table asks for *"descent rate under both drogue and main
 parachutes"* — the vertical rate — and that is what essentially every team
@@ -988,26 +995,29 @@ Invert the requirement. For the heaviest section:
 
 $$V_\text{max} = \sqrt{\frac{2\,KE_\text{max}}{m_\text{section}}}$$
 
-With $KE_\text{max} = 75$ ft·lbf $= 101.7$ J and $m = 7.711$ kg (17.00 lb):
+With $KE_\text{max} = 75$ ft·lbf $= 101.7$ J and $m = 9.557$ kg (21.07 lb,
+spent case included):
 
-$$V_\text{max} = \sqrt{\frac{2 \times 101.7}{7.711}} = 5.14~\text{m/s} = 16.9~\text{fps}$$
+$$V_\text{max} = \sqrt{\frac{2 \times 101.7}{9.557}} = 4.61~\text{m/s} = 15.1~\text{fps}$$
 
 Then size the canopy for the **whole descending mass** at that rate:
 
 $$C_d S = \frac{2 m_\text{total}\, g}{\rho V_\text{max}^2}
-= \frac{2(16.18)(9.807)}{1.225(5.14)^2} = 9.80~\text{m}^2$$
+= \frac{2(16.18)(9.807)}{1.225(4.61)^2} = 12.2~\text{m}^2$$
 
-$$S = \frac{9.80}{2.20} = 4.45~\text{m}^2
+$$S = \frac{12.2}{2.20} = 5.53~\text{m}^2
 \quad\Rightarrow\quad
-D = \sqrt{\frac{4S}{\pi}} = 2.38~\text{m} = 93.7~\text{in}$$
+D = \sqrt{\frac{4S}{\pi}} = 2.65~\text{m} = 104.5~\text{in}$$
 
-So a 96-inch main is the bare minimum. The template uses **108 inches**,
-deliberately, because 94 inches leaves no margin once Monte Carlo scatter in
-mass, $C_d$, and density is applied. During development a 96-inch main gave 70.4
-ft·lbf against a 75 limit — 6% margin, which dispersion would eat.
+So 104.5 inches is the bare minimum, and the template's **108-inch** main clears
+it by very little: 69.5 ft·lbf against 75, a 7% margin that Monte Carlo scatter
+in mass, $C_d$, and density would eat. Leave the motor case out and the same
+arithmetic says 93.7 inches is enough — a 96-inch main chosen that way lands
+this booster at about 88 ft·lbf, a FAIL.
 
 **Rule of thumb: size for about 75–80% of the KE limit at nominal**, so the
-distribution stays clear of it.
+distribution stays clear of it. For this booster that is roughly a 120-inch
+main.
 
 ## 11.5 Descent time and the conflict with drift
 
@@ -1219,20 +1229,23 @@ Spearman rather than Pearson because it detects any *monotone* relationship, not
 just a linear one — wind speed's effect on drift is monotone but not linear, and
 Pearson would understate it.
 
-Template vehicle, 1,000 cases, seed 12345:
+Template vehicle, 1,000 cases, seed 12345, with `dry_mass` dispersed at
+σ = 1.5%. (The reference vehicle has no mass worksheet, and the shipped
+`dry_mass` σ is 0 — a worksheet's per-part sigmas are the better model — so
+without that one change mass would not appear here at all.)
 
 | Input | ρ vs apogee | ρ vs drift | ρ vs landing speed |
 |---|---:|---:|---:|
-| `motor_total_impulse` | **+0.605** | −0.007 | +0.006 |
-| `drag_coefficient` | **−0.528** | −0.059 | −0.012 |
-| `dry_mass` | −0.267 | −0.000 | +0.108 |
-| `wind_speed_mps` | −0.226 | −0.015 | +0.011 |
-| `rail_angle_deg` | −0.159 | **+0.829** | −0.009 |
-| `temperature_k` | +0.098 | +0.032 | +0.179 |
-| `pressure_pa` | −0.072 | −0.014 | −0.105 |
-| `motor_burn_time` | −0.054 | −0.038 | +0.008 |
-| `cg_shift` | +0.053 | −0.018 | −0.077 |
-| `main_cd` | −0.010 | +0.019 | **−0.965** |
+| `motor_total_impulse` | **+0.635** | +0.061 | −0.047 |
+| `drag_coefficient` | **−0.486** | −0.053 | +0.007 |
+| `dry_mass` | −0.255 | +0.004 | +0.144 |
+| `wind_speed_mps` | −0.218 | +0.019 | +0.011 |
+| `rail_angle_deg` | −0.146 | **+0.823** | +0.053 |
+| `temperature_k` | +0.142 | −0.035 | +0.123 |
+| `drogue_deploy_delay_s` | −0.063 | +0.058 | −0.013 |
+| `main_cd` | +0.057 | −0.036 | **−0.960** |
+| `pressure_pa` | −0.040 | −0.004 | −0.075 |
+| `motor_burn_time` | −0.016 | −0.010 | −0.033 |
 
 Read it as a priority list, and read all three columns — **the dominant driver is
 different for every question you ask.** Apogee is a motor-and-drag problem.
@@ -1249,7 +1262,7 @@ is about landing energy.
 
 These figures come from 1,000 cases because smaller runs give *misleading*
 rankings, not merely noisier ones. Development runs of 60 to 200 cases put
-`temperature_k` third at ρ ≈ +0.40; at 1,000 cases it settles at +0.10. The
+`temperature_k` third at ρ ≈ +0.40; at 1,000 cases it settles at +0.14. The
 small-sample value was sampling noise wearing the costume of a physical effect,
 and a team acting on it would have gone off chasing the wrong variable.
 
@@ -1279,17 +1292,17 @@ within 1%.
 
 | Quantity | OpenRocket | RocketPy | Diff |
 |---|---:|---:|---:|
-| Apogee | 4,534.22 ft | 4,536.87 ft | **+0.06%** |
+| Apogee | 4,534.22 ft | 4,536.91 ft | **+0.06%** |
 | Max velocity | 606.03 fps | 606.20 fps | +0.03% |
 | Max Mach | 0.544 | 0.544 | +0.07% |
 | Max acceleration | 8.83 g | 8.83 g | −0.03% |
 | Time to apogee | 16.74 s | 16.77 s | +0.13% |
-| Static stability | 2.18 cal | 2.19 cal | +0.47% |
+| Static stability | 2.18 cal | 2.18 cal | +0.1% |
 | Descent time | 76.94 s | 77.83 s | +1.16% |
 | Descent rate (drogue) | 108.72 fps | 109.71 fps | +0.91% |
 | Descent rate (main) | 14.61 fps | 14.77 fps | +1.10% |
 | **Rail exit velocity** | **78.81 fps** | **70.42 fps** | **−10.64%** |
-| **Drift from pad** | **1,355.0 ft** | **1,218.7 ft** | **−10.06%** |
+| **Drift from pad** | **1,355.0 ft** | **1,219.7 ft** | **−9.99%** |
 
 These are exactly reproducible: `python scripts/run_nominal.py`.
 

@@ -58,7 +58,7 @@ def main() -> int:
     base = orb.run_simulation(orb.make_simulation(doc, rocket, site, overrides),
                               rocket, keep_series=True)
     power_on, power_off = rpm.export_drag_curves(base)
-    mass_props = rpm.export_mass_properties(rocket, orb.ensure_jvm())
+    mass_props = rpm.mass_properties(vehicle, rocket, orb.ensure_jvm())
 
     env = rpm.build_environment(site, overrides)
     rk = rpm.build_rocket(vehicle, motor, mass_props, power_on, power_off,

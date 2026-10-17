@@ -45,6 +45,12 @@ def check(vehicle: Vehicle, ballast_kg: float) -> list[str]:
         bad.append(f"pieces sum to {U.kg_to_lb(got):.4f} lb but the structure is "
                    f"{U.kg_to_lb(want):.4f} lb")
 
+    # The spent motor case must land in exactly one piece: the mount's.
+    with_case = vehicle.landing_section_masses_kg(ballast_kg, motor_case_kg=1.0)
+    if abs(sum(with_case.values()) - got - 1.0) > TOL_KG:
+        bad.append(f"the motor case lands in no piece: no landing section holds "
+                   f"the aft body tube {vehicle.sections[-1].name!r}")
+
     if vehicle.unassigned_members():
         bad.append(f"not in any landing section: {vehicle.unassigned_members()}")
     return bad

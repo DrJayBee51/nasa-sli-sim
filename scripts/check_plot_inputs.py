@@ -7,7 +7,7 @@ only sound if the same (seed, N, site, uncertainty) reproduces the campaign's
 draws.  This flies 20 real cases and compares.
 
 Exits 0 if the draws match, 1 otherwise.  Run it after touching draw_sample,
-run_montecarlo's sampling loop, or plot_inputs' replica of it.
+draw_samples, or how run_montecarlo hands samples to its workers.
 """
 
 from __future__ import annotations
@@ -36,18 +36,14 @@ def main() -> int:
                            workers=2, uncertainty=unc, progress=False)
     flown = df.sort_values("index")
 
-    # plot_inputs.py's loop, verbatim.
-    rng = np.random.default_rng(SEED)
-    regenerated = []
-    for _ in range(N):
-        sample = mc.draw_sample(unc, site, rng)
-        rng.integers(0, 2 ** 31 - 1)
-        regenerated.append(sample)
+    # What plot_inputs.py draws: the same function, with nothing flown.
+    regenerated = mc.draw_samples(unc, site, N, SEED, vehicle, vehicle.ballast_min_kg)
 
     # Compare in memory, never through a CSV: to_csv shortens floats, which
     # costs ~1e-13 of relative precision and would mask a real divergence.
     worst, worst_param = 0.0, ""
-    for param in [c[len("in_"):] for c in flown.columns if c.startswith("in_")]:
+    params = [c[len("in_"):] for c in flown.columns if c.startswith("in_")]
+    for param in params:
         a = flown[f"in_{param}"].to_numpy()
         b = np.array([s[param] for s in regenerated])
         if a.shape != b.shape:
@@ -61,10 +57,10 @@ def main() -> int:
     if worst:
         print(f"  FAIL  draws diverge; worst is {worst_param} at {worst:.2e} relative")
         print("        plot_inputs.py no longer reproduces a campaign -- check that")
-        print("        its loop still consumes the rng exactly as run_montecarlo does")
+        print("        run_montecarlo still flies exactly what draw_samples returns")
         return 1
 
-    print(f"  pass  all 16 parameters bit-identical across {N} cases")
+    print(f"  pass  all {len(params)} inputs bit-identical across {N} cases")
     return 0
 
 

@@ -252,8 +252,11 @@ def check_mass_closure(vehicle: Vehicle, ballast_kg: float, propellant_kg: float
     vehicle -- a spec bug that would otherwise surface as an unexplained
     discrepancy in the report.
     """
-    sections = sum(vehicle.landing_section_masses_kg(ballast_kg).values())
-    booked = sections + vehicle.recovery_mass_kg() + propellant_kg + motor_case_kg
+    # The spent case lands with the section holding the mount, so it is booked
+    # there -- the FRR's "individual section landing masses" include it.
+    sections = sum(vehicle.landing_section_masses_kg(
+        ballast_kg, motor_case_kg=motor_case_kg).values())
+    booked = sections + vehicle.recovery_mass_kg() + propellant_kg
     err = booked - simulated_launch_mass_kg
     st = Status.PASS if abs(err) <= tol_kg else Status.FAIL
     unassigned = vehicle.unassigned_members()
@@ -356,7 +359,8 @@ def check_all(result, vehicle: Vehicle, motor: dict[str, Any],
         check_apogee_delay(vehicle.drogue["deploy_delay_s"]),
     ]
     checks += check_kinetic_energy(
-        vehicle.landing_section_masses_kg(ballast_kg),
+        vehicle.landing_section_masses_kg(
+            ballast_kg, motor_case_kg=motor["burnout_mass_kg"]),
         vertical_mps=result.landing_vertical_mps,
         total_mps=result.ground_hit_velocity_mps,
     )

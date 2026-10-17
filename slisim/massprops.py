@@ -302,3 +302,60 @@ def rollup(sheet: Sheet) -> dict:
     tethered = [(p.component, p.section, float(p.mass_lb))
                 for p in sheet.parts if p.kind == "tethered"]
     return {"sections": sections, "kinds": kinds, "tethered": tethered}
+
+
+def state(sheet: Sheet, rng=None, ballast_lb: float = 0.0,
+          ballast_section: str | None = None) -> dict:
+    """Dry-vehicle mass, CG and inertia -- nominal, or one Monte Carlo draw.
+
+    With `rng`, every part draws its own mass, position and inertia from its
+    sigma columns, and the totals are rebuilt from the draws, so a heavy
+    payload moves the CG and the inertia together the way real hardware does.
+    One draw scales both of a part's inertias: they share a cause (the part's
+    mass distribution), so they should err together.
+
+    Ballast is a point mass at its section's structure CG -- where
+    or_bridge.build_document puts it.  Units are lb, in, lb*in^2, from the
+    nose tip.  `members` is each piece's mass keyed the way
+    Vehicle.landing_section_masses_kg keys them, so req 3.2 can be checked
+    against the same draw that flew.
+    """
+    fronts = sheet.fronts()
+    nose = sheet.sections[0][0]
+    items, members = [], {}
+    for p in sheet.parts:
+        m, x = float(p.mass_lb), float(fronts[p.section] + p.from_front_in)
+        ip, ir = float(p.inertia_pitch), float(p.inertia_roll)
+        if rng is not None:
+            m = max(0.0, m * (1.0 + rng.normal(0.0, float(p.mass_sigma_pct) / 100.0)))
+            x += rng.normal(0.0, float(p.position_sigma_in))
+            k = max(0.0, 1.0 + rng.normal(0.0, float(p.inertia_sigma_pct) / 100.0))
+            ip, ir = ip * k, ir * k
+        items.append((m, x, ip, ir, p))
+        if p.kind in ("main", "drogue", "shock_cord"):
+            continue        # hang outside the airframe on landing (FRR)
+        key = ("fins" if p.kind == "fins" else p.component if p.kind == "tethered"
+               else "nose_cone" if p.section == nose else p.section)
+        members[key] = members.get(key, 0.0) + m
+
+    if ballast_lb:
+        sec = [(m, x) for m, x, _, _, p in items if p.section == ballast_section
+               and p.kind in ("structure", "tethered")]
+        ms = sum(m for m, _ in sec)
+        x_b = sum(m * x for m, x in sec) / ms if ms else float(fronts[ballast_section])
+        items.append((ballast_lb, x_b, 0.0, 0.0, None))
+        key = "nose_cone" if ballast_section == nose else ballast_section
+        members[key] = members.get(key, 0.0) + ballast_lb
+
+    mass = sum(i[0] for i in items)
+    cg = sum(i[0] * i[1] for i in items) / mass
+    pitch = sum(ip + m * (x - cg) ** 2 for m, x, ip, _, _ in items)
+    roll = sum(ir for _, _, _, ir, _ in items)
+    return {"mass_lb": mass, "cg_in": cg, "inertia_pitch": pitch,
+            "inertia_roll": roll, "members": members}
+
+
+def has_dispersion(sheet: Sheet) -> bool:
+    """True if any part carries a nonzero sigma."""
+    return any(p.mass_sigma_pct or p.position_sigma_in or p.inertia_sigma_pct
+               for p in sheet.parts)

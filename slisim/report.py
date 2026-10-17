@@ -171,7 +171,8 @@ def plot_landing_scatter(df: pd.DataFrame, out_dir: Path, ellipse: dict | None =
 # order as config/uncertainty.yaml so the figure reads like the file it came
 # from.  A parameter missing from here still plots, under "Other".
 INPUT_GROUPS: list[tuple[str, tuple[str, ...]]] = [
-    ("Vehicle", ("dry_mass", "cg_shift", "drag_coefficient")),
+    ("Vehicle", ("mass_lb", "cg_in", "inertia_pitch_lb_in2", "dry_mass",
+                 "drag_coefficient")),
     ("Motor", ("motor_total_impulse", "motor_burn_time", "motor_dry_mass")),
     ("Launch conditions", ("rail_angle_deg", "rail_direction_deg", "wind_speed_mps",
                            "wind_direction_deg", "temperature_k", "pressure_pa")),
@@ -180,7 +181,8 @@ INPUT_GROUPS: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 # Axis units by name suffix, for parameters already drawn in absolute units.
-_UNIT_BY_SUFFIX = {"_deg": "deg", "_mps": "m/s", "_k": "K", "_pa": "Pa",
+_UNIT_BY_SUFFIX = {"_lb_in2": "lb-in^2", "_lb": "lb", "_in": "in from nose",
+                   "_deg": "deg", "_mps": "m/s", "_k": "K", "_pa": "Pa",
                    "_ft": "ft", "_s": "s"}
 
 # How to turn a draw into the quantity it perturbs, given that parameter's
@@ -192,7 +194,6 @@ _UNIT_BY_SUFFIX = {"_deg": "deg", "_mps": "m/s", "_k": "K", "_pa": "Pa",
 # here is plotted exactly as drawn.
 _ABSOLUTE: dict[str, tuple[str, str, object]] = {
     "dry_mass":                ("scale", "lb",          U.kg_to_lb),
-    "cg_shift":                ("shift", "in from nose", U.m_to_in),
     "motor_total_impulse":     ("scale", "N-s",         None),
     "motor_burn_time":         ("scale", "s",           None),
     "motor_dry_mass":          ("scale", "lb",          U.kg_to_lb),
@@ -204,7 +205,9 @@ _ABSOLUTE: dict[str, tuple[str, str, object]] = {
 
 # Shown instead of the raw key where the absolute quantity is a different thing
 # from the perturbation, rather than the same thing in real units.
-_ABSOLUTE_TITLE = {"cg_shift": "cg position",
+_ABSOLUTE_TITLE = {"mass_lb": "dry mass (part draws)",
+                   "cg_in": "dry CG",
+                   "inertia_pitch_lb_in2": "dry pitch inertia",
                    "main_deploy_altitude_ft": "main deploy altitude",
                    "drogue_deploy_delay_s": "drogue deploy delay",
                    "dry_mass": "dry mass",
@@ -235,7 +238,7 @@ def _to_absolute(param: str, drawn: pd.Series, nominal: float | None,
     archived campaign still plots, labeled as the relative quantity it is.
     """
     rule = _ABSOLUTE.get(param)
-    title = param.replace("_", " ")
+    title = _ABSOLUTE_TITLE.get(param, param.replace("_", " "))
     if rule is None or nominal is None:
         relative = rule is not None and rule[0] == "scale"
         return (drawn, "x nominal" if relative else _input_unit(param, None),
