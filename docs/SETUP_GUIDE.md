@@ -665,14 +665,16 @@ then a requirement table ending in:
   RESULT: all requirements satisfied
 ```
 
-If you got that, you are done. If not, go to
+If you got that, you are done with this guide. If not, go to
 [Part 3](#part-3--troubleshooting-the-installation).
 
-> **Shorthand in other documents.** The User Guide and the README write
-> `python` for whichever of `.venv\Scripts\python` or `.venv/bin/python`
-> applies to your machine. Always use the one inside `.venv` — a bare `python`
-> will use your system Python and fail with `ModuleNotFoundError`
-> ([§3.1](#31-modulenotfounderror-no-module-named-rocketpy)).
+> **From here on, use the User Guide.** Its
+> [Part 0](USER_GUIDE.md#part-0--starting-a-session) is the routine for every
+> session, in PowerShell and Git Bash: open a terminal, go to the project
+> folder, activate the environment, pull. After activating, the User Guide's
+> commands are written with a plain `python`. In a terminal that is not
+> activated, a bare `python` uses your system Python and fails with
+> `ModuleNotFoundError` ([§3.1](#31-modulenotfounderror-no-module-named-rocketpy)).
 
 ---
 

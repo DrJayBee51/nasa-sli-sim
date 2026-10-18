@@ -1,6 +1,6 @@
-"""Generate a synthetic altimeter CSV.
+"""Generate synthetic flight data: an altimeter CSV and a full telemetry log.
 
-Two uses:
+Three uses:
 
 1. The team can exercise the whole post-flight pipeline before they have real
    flight data, so the FRR analysis is not being written for the first time the
@@ -8,6 +8,11 @@ Two uses:
 2. It validates `fit_cd.py`: generate a trace with a KNOWN drag scale, then
    check the fitter recovers it.  A fitter nobody has tested against a known
    answer is not evidence of anything.
+3. `synthetic_telemetry.csv` -- barometric altitude, IMU and GPS, laid out like
+   a flight computer's log, with its clock started 2 s before ignition -- is
+   practice data for `compare_flight.py`, and the known answer that checks it.
+   The IMU columns stop at the first deployment, because the simulation's
+   attitude does.
 
     python scripts/make_synthetic_flight.py --cd-scale 1.18 --noise-ft 8
 """
@@ -63,7 +68,8 @@ def main() -> int:
     env = rpm.build_environment(site, overrides)
     rk = rpm.build_rocket(vehicle, motor, mass_props, power_on, power_off,
                           drag_scale=args.cd_scale)
-    res = rpm.extract(rpm.build_flight(rk, env, site, overrides), rk, motor)
+    flight = rpm.build_flight(rk, env, site, overrides)
+    res = rpm.extract(flight, rk, motor)
 
     s = res.series
     t = np.arange(0.0, float(s["time_s"][-1]), 1.0 / args.rate_hz)
@@ -79,7 +85,31 @@ def main() -> int:
         "Velocity (ft/s)": np.round(vel_fps, 1),
     }).to_csv(out, index=False)
 
+    # The telemetry log: what an altimeter, an IMU and a GPS would have recorded,
+    # with the logger switched on PAD_S before ignition.
+    PAD_S = 2.0
+    st = rpm.state_history(flight, dt=1.0 / args.rate_hz)
+    pad = st.iloc[[0] * int(PAD_S * args.rate_hz)].copy()
+    pad[["gyro_x_dps", "gyro_y_dps", "gyro_z_dps"]] = 0.0
+    log = pd.concat([pad, st], ignore_index=True)
+    n = len(log)
+    noisy = lambda col, sd: log[col].to_numpy() + rng.normal(0.0, sd, n)  # noqa: E731
+    tel = Path(args.out).with_name("synthetic_telemetry.csv")
+    pd.DataFrame({
+        "Time (s)": np.round(np.arange(n) / args.rate_hz, 3),
+        "Altitude (ft)": np.round(noisy("baro_altitude_ft", args.noise_ft), 1),
+        "Accel X (g)": np.round(noisy("accel_x_g", 0.02), 3),
+        "Accel Y (g)": np.round(noisy("accel_y_g", 0.02), 3),
+        "Accel Z (g)": np.round(noisy("accel_z_g", 0.02), 3),
+        "Gyro X (deg/s)": np.round(noisy("gyro_x_dps", 0.5), 2),
+        "Gyro Y (deg/s)": np.round(noisy("gyro_y_dps", 0.5), 2),
+        "Gyro Z (deg/s)": np.round(noisy("gyro_z_dps", 0.5), 2),
+        "Latitude": np.round(noisy("latitude_deg", 3e-5), 7),    # ~3 m GPS scatter
+        "Longitude": np.round(noisy("longitude_deg", 3e-5), 7),
+    }).to_csv(tel, index=False)
+
     print(f"Wrote {out}")
+    print(f"Wrote {tel}  (logger started {PAD_S:.0f} s before ignition)")
     print(f"  TRUE drag scale baked in : {args.cd_scale:.4f}")
     print(f"  Apogee                   : {U.m_to_ft(res.apogee_m):,.0f} ft")
     print(f"  Baro noise               : {args.noise_ft:.1f} ft 1-sigma "
@@ -87,6 +117,9 @@ def main() -> int:
     print()
     print("Recover the drag scale with:")
     print(f"  python scripts/fit_cd.py {out} --wind {args.wind_mph} "
+          f"--temp-f {args.temp_f}")
+    print("Compare the telemetry against the model with:")
+    print(f"  python scripts/compare_flight.py {tel} --wind {args.wind_mph} "
           f"--temp-f {args.temp_f}")
     return 0
 

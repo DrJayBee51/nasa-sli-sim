@@ -293,3 +293,120 @@ def kinetic_energy_table(vehicle: Vehicle, descent_rate_mps: float,
             "status": "PASS" if ke <= 75.0 else "FAIL",
         })
     return pd.DataFrame(rows)
+
+
+def launch_overrides(wind_mph=None, wind_dir=None, temp_f=None,
+                     pressure_inhg=None, rail_angle=None) -> dict[str, float]:
+    """Launch-day conditions, in the units people read off a weather report,
+    as the overrides both engines take.  Anything left None keeps the site's."""
+    ov = {}
+    if wind_mph is not None:
+        ov["wind_speed_mps"] = U.mph_to_mps(wind_mph)
+    if wind_dir is not None:
+        ov["wind_direction_deg"] = wind_dir
+    if temp_f is not None:
+        ov["temperature_k"] = U.f_to_k(temp_f)
+    if pressure_inhg is not None:
+        ov["pressure_pa"] = U.inhg_to_pa(pressure_inhg)
+    if rail_angle is not None:
+        ov["rail_angle_deg"] = rail_angle
+    return ov
+
+
+# ---------------------------------------------------------------------------
+#  Telemetry ingest and alignment
+# ---------------------------------------------------------------------------
+#  Channels compared against rocketpy_model.state_history, with the names flight
+#  computers commonly give them.  Matched exactly, after lower-casing and
+#  dropping any "(units)", so "Accel Z (g)" and "accel_z" both find accel_z_g.
+#  Anything else: pass an explicit mapping (compare_flight.py --map).
+TELEMETRY_FIELDS = {
+    "accel_z_g": ["accel z", "accel_z", "accelz", "axial accel", "accel axial",
+                  "acceleration z", "az"],
+    "accel_x_g": ["accel x", "accel_x", "accelx", "acceleration x", "ax"],
+    "accel_y_g": ["accel y", "accel_y", "accely", "acceleration y", "ay"],
+    "gyro_x_dps": ["gyro x", "gyro_x", "gyrox", "rate x", "gx"],
+    "gyro_y_dps": ["gyro y", "gyro_y", "gyroy", "rate y", "gy"],
+    "gyro_z_dps": ["gyro z", "gyro_z", "gyroz", "rate z", "roll rate", "gz"],
+    "latitude_deg": ["latitude", "lat", "gps lat", "gps_lat"],
+    "longitude_deg": ["longitude", "lon", "lng", "long", "gps lon", "gps_lon"],
+}
+
+
+def _bare(name: str) -> str:
+    """'Accel Z (m/s^2)' -> 'accel z': the name without its units."""
+    return " ".join(name.split("(")[0].replace("_", " ").lower().split())
+
+
+def load_telemetry(path: str | Path, mapping: dict[str, str] | None = None,
+                   altitude_units: str = "auto") -> pd.DataFrame:
+    """A flight computer's CSV, as time, pad-zeroed altitude and whichever
+    TELEMETRY_FIELDS it carries, in g, deg/s and degrees.
+
+    Units come from the column header where it says: "(m/s^2)" or "(m/s2)"
+    accelerations are converted to g, "(rad/s)" rates to deg/s.  Otherwise g
+    and deg/s are assumed -- check the logger's manual and say so in --map if
+    not.  Time is left as logged; align it with launch_time().
+    """
+    path = Path(path)
+    df = pd.read_csv(path, comment="#", skip_blank_lines=True)
+    df.columns = [str(c).strip() for c in df.columns]
+    mapping = dict(mapping or {})
+    tcol = mapping.pop("time_s", None) or _match(list(df.columns), _TIME_KEYS)
+    acol = mapping.pop("altitude_ft", None) or _match(list(df.columns), _ALT_KEYS)
+    if tcol is None or acol is None:
+        raise ValueError(f"no time/altitude column in {path.name}; columns are "
+                         f"{list(df.columns)}. Name them with --map "
+                         f"time_s=<column> --map altitude_ft=<column>")
+
+    bare = {_bare(c): c for c in df.columns}
+    cols = {}
+    for field, aliases in TELEMETRY_FIELDS.items():
+        col = mapping.pop(field, None) or next(
+            (bare[a] for a in aliases if a in bare), None)
+        if col is not None:
+            cols[field] = col
+    if mapping:
+        raise ValueError(f"unknown --map field(s) {sorted(mapping)}; use time_s, "
+                         f"altitude_ft or one of {sorted(TELEMETRY_FIELDS)}")
+
+    num = lambda c: pd.to_numeric(df[c], errors="coerce").to_numpy(dtype=float)  # noqa: E731
+    t, alt = num(tcol), num(acol)
+    units = altitude_units if altitude_units != "auto" else (
+        "ft" if np.nanmax(alt) > 2500 else "m")
+    alt_ft = alt if units == "ft" else U.m_to_ft(alt)
+    out = pd.DataFrame({"time_s": t, "altitude_ft": alt_ft - np.nanmedian(alt_ft[:20])})
+    for field, col in cols.items():
+        v, head = num(col), col.lower()
+        if field.startswith("accel") and ("m/s" in head):
+            v = v / U.G0
+        if field.startswith("gyro") and "rad" in head:
+            v = np.degrees(v)
+        out[field] = v
+    out = out[np.isfinite(out["time_s"]) & np.isfinite(out["altitude_ft"])]
+    out.attrs.update(source=path.name, columns={"time_s": tcol, "altitude_ft": acol,
+                                                **cols}, altitude_units=units)
+    return out.reset_index(drop=True)
+
+
+def launch_time(time_s, altitude_ft, threshold_ft: float = 100.0) -> float:
+    """When altitude first passes `threshold_ft`, interpolated.
+
+    Used to put a log and a simulation on one clock.  Flight computers start
+    their clocks at power-on or launch detection, RocketPy at ignition, so raw
+    times never line up; the 100 ft crossing is unambiguous in both and clear
+    of the pad noise a baro sensor sees at liftoff.
+    """
+    t, a = np.asarray(time_s, float), np.asarray(altitude_ft, float)
+    i = int(np.argmax(a > threshold_ft))
+    if a[i] <= threshold_ft:
+        raise ValueError(f"altitude never exceeds {threshold_ft:.0f} ft")
+    return float(np.interp(threshold_ft, a[i - 1:i + 1], t[i - 1:i + 1])) if i else float(t[0])
+
+
+def local_ft(lat_deg, lon_deg, lat0: float, lon0: float):
+    """Latitude/longitude as feet east and north of a reference point."""
+    r = 6_371_000.0
+    north = r * np.radians(np.asarray(lat_deg) - lat0)
+    east = r * np.cos(np.radians(lat0)) * np.radians(np.asarray(lon_deg) - lon0)
+    return U.m_to_ft(east), U.m_to_ft(north)

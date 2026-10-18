@@ -78,8 +78,13 @@ def main() -> int:
             mass_props = rpm.mass_properties(vehicle, rocket, orb.ensure_jvm(), ballast)
             env = rpm.build_environment(site)
             rk = rpm.build_rocket(vehicle, motor, mass_props, power_on, power_off)
-            rp_res = rpm.extract(rpm.build_flight(rk, env, site), rk, motor)
+            flight = rpm.build_flight(rk, env, site)
+            rp_res = rpm.extract(flight, rk, motor)
             results["RocketPy"] = rp_res
+            # Every state, logged like a flight computer, for overlaying telemetry.
+            states = out_dir / f"flight_states_{U.kg_to_lb(ballast):.0f}lb.csv"
+            rpm.state_history(flight).to_csv(states, index=False, float_format="%.6g")
+            print(f"  States  : {states}")
 
             cmp_df = analysis.compare(or_res.to_row(), rp_res.to_row())
             print("  OpenRocket vs RocketPy")

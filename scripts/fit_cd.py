@@ -64,17 +64,8 @@ def main() -> int:
         print(f"  {k:18s} {v:12.2f}")
     print()
 
-    overrides = {}
-    if args.wind is not None:
-        overrides["wind_speed_mps"] = U.mph_to_mps(args.wind)
-    if args.wind_dir is not None:
-        overrides["wind_direction_deg"] = args.wind_dir
-    if args.temp_f is not None:
-        overrides["temperature_k"] = U.f_to_k(args.temp_f)
-    if args.pressure_inhg is not None:
-        overrides["pressure_pa"] = U.inhg_to_pa(args.pressure_inhg)
-    if args.rail_angle is not None:
-        overrides["rail_angle_deg"] = args.rail_angle
+    overrides = postflight.launch_overrides(args.wind, args.wind_dir, args.temp_f,
+                                            args.pressure_inhg, args.rail_angle)
 
     if overrides:
         print("Launch-day conditions applied to the model:")

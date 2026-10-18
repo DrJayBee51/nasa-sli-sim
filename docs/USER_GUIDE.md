@@ -3,34 +3,24 @@
 **NASA Student Launch — Dual-Engine Simulation Framework**
 Season 2026–2027 · College/University (USLI) ruleset
 
-This guide covers using the framework once it is installed: a guided first
-run, defining your vehicle, launch sites, Monte Carlo dispersion, reading the
-output, and how the tools fit the season's milestones. If you have not
-installed it yet, start with the [Setup Guide](SETUP_GUIDE.md). Everything here
-assumes its verification step (§2.9) passes.
+This guide covers using the framework once it is installed: starting a
+session, a guided first run, defining your vehicle, launch sites, Monte Carlo
+dispersion, reading the output, and troubleshooting. It is meant to be the only
+document you need day to day. The [Setup Guide](SETUP_GUIDE.md) is for
+installing the framework once; when its verification step (§2.9) passes, come
+here and stay here.
+
+Every step is a command typed into a terminal, and every result is text in the
+terminal or a file written to `output/`. Commands are given for both
+**PowerShell** and **Git Bash** wherever the two differ. Where only one block is
+shown, it works unchanged in either — which, once the environment is active
+([§0.3](#03-activate-the-environment)), is almost everywhere.
+
+**Start with Part 0 every session.** It is four commands, and skipping one of
+them is behind nearly every "it worked yesterday" problem.
 
 Work through Part 1 at a keyboard: about 30 minutes, and the fastest way to
 understand what the framework does.
-
-Every step here is a command typed into a terminal and run from the project
-folder, and every result is text in the terminal or a file written to
-`output/`. See
-[Before you start](SETUP_GUIDE.md#before-you-start-this-is-a-command-line-tool)
-in the Setup Guide if that is unfamiliar.
-
-**Where to type the commands.** The easiest place is the terminal built into
-VS Code (Ctrl+`), because the file tree, the editor, and the commands then
-share one window — you can edit `vehicle.yaml`, run a flight, and open the
-resulting figure without leaving it. Set that up in
-[§2.7 of the Setup Guide](SETUP_GUIDE.md#27-visual-studio-code-recommended).
-Any other terminal works identically; nothing below depends on VS Code.
-
-> **Shorthand.** This guide writes `python` for whichever of
-> `.venv\Scripts\python` (Windows PowerShell), `.venv/Scripts/python` (Git Bash
-> on Windows), or `.venv/bin/python` (macOS/Linux) applies to your machine. In
-> VS Code's terminal, with the interpreter selected, a bare `python` already
-> *is* that one — the prompt shows `(.venv)`. Everywhere else, a bare `python`
-> uses your system Python and fails with `ModuleNotFoundError`.
 
 Two further companions: [`FRAMEWORK_TOUR.md`](FRAMEWORK_TOUR.md) walks through
 how the code is structured, and [`FLIGHT_DYNAMICS.md`](FLIGHT_DYNAMICS.md)
@@ -40,6 +30,7 @@ explains the physics behind everything here.
 
 ## Table of contents
 
+- [Part 0 — Starting a session](#part-0--starting-a-session)
 - [Part 1 — Guided first run](#part-1--guided-first-run)
 - [Part 2 — Defining your vehicle](#part-2--defining-your-vehicle)
 - [Part 3 — Launch sites](#part-3--launch-sites)
@@ -49,6 +40,281 @@ explains the physics behind everything here.
 - [Part 7 — Command reference](#part-7--command-reference)
 - [Appendix A — Cheat sheet](#appendix-a--cheat-sheet)
 - [Appendix B — Glossary](#appendix-b--glossary)
+
+---
+
+# Part 0 — Starting a session
+
+Do these four things every time you sit down: open a terminal, go to the
+project folder, activate the environment, and pull the team's latest work. The
+whole routine is in [§0.6](#06-the-whole-routine).
+
+## 0.1 Open a terminal
+
+**In VS Code (recommended).** Open the project *folder* (File → Open Folder),
+then press **Ctrl+`** (the backtick key, above Tab). The terminal opens in the
+project folder, beside the file tree and the editor, so you can edit a vehicle
+file, run a flight and open the figure without leaving the window. To choose
+the shell, click the **˅** beside the **+** in the terminal panel: *PowerShell*
+is the Windows default, and *Git Bash* appears once Git for Windows is
+installed.
+
+**Outside VS Code.** On Windows, open *PowerShell* or *Git Bash* from the Start
+menu. On macOS or Linux, open *Terminal*; it behaves like Git Bash throughout
+this guide, except where a separate macOS/Linux line is given.
+
+**Which shell am I in?** Look at the prompt:
+
+| Prompt looks like | Shell |
+|---|---|
+| `PS C:\Users\you\nasa-sli-sim>` | PowerShell |
+| `you@LAPTOP MINGW64 /c/Users/you/nasa-sli-sim` then `$` on the next line | Git Bash |
+| `you@mac nasa-sli-sim %` or `$` | macOS / Linux |
+
+Both Windows shells work equally well. Pick one and use its blocks; the only
+mistake is copying a command from the other shell's block.
+
+## 0.2 Go to the project folder
+
+Every command runs from the **project folder**: the one containing `scripts/`,
+`config/` and `slisim/`. VS Code's terminal starts there. Anywhere else, move
+there with `cd`, using the path where you cloned the repository (the paths below
+are placeholders):
+
+PowerShell:
+
+```powershell
+cd C:\Users\you\nasa-sli-sim
+```
+
+Git Bash:
+
+```bash
+cd /c/Users/you/nasa-sli-sim
+```
+
+Git Bash spells `C:\Users` as `/c/Users` and uses forward slashes. In either
+shell, put a path containing spaces in quotes: `cd "C:\My Projects\nasa-sli-sim"`.
+If you are unsure of the path, open the folder in File Explorer and copy it from
+the address bar — PowerShell takes it exactly as copied.
+
+Check you are in the right place (works in both shells):
+
+```bash
+ls scripts
+```
+
+You should see `run_nominal.py` and the other scripts. If `ls` reports the
+folder does not exist, you are one level off: your copy may sit inside a larger
+folder (for example in a `sim/` subfolder), so `cd` into it.
+
+> **Why it matters.** Running from the wrong folder fails outright —
+> `can't open file '...\scripts\run_nominal.py': [Errno 2] No such file or directory`.
+> Pointing at the script from outside (`python sim/scripts/run_nominal.py`)
+> starts, but every relative path you give it, like
+> `--vehicle config/vehicles/full_scale.yaml`, is then looked for in the wrong
+> place. Run from the project folder and every command in this guide works as
+> written.
+
+## 0.3 Activate the environment
+
+The framework's packages — RocketPy, the OpenRocket bridge, PyYAML — are
+installed in a private Python inside the project, the **virtual environment**
+in `.venv/`. Your computer's own Python does not have them. Activating the
+environment makes `python` mean that private copy for the rest of the terminal
+session:
+
+PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Git Bash:
+
+```bash
+source .venv/Scripts/activate
+```
+
+macOS / Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+The prompt now starts with **`(.venv)`**. That is the sign to look for before
+running anything. Confirm it (identical in every shell):
+
+```bash
+python -c "import sys; print(sys.executable)"
+```
+
+The path printed must be inside the project's `.venv` folder, for example
+`C:\Users\you\nasa-sli-sim\.venv\Scripts\python.exe`. If it points anywhere
+else, the environment is not active.
+
+Four things to know:
+
+- **Activation lasts for one terminal.** A new tab, a new window, or a
+  restarted VS Code needs it again. `deactivate` turns it off by hand.
+- **VS Code can do it for you.** Press Ctrl+Shift+P, run
+  `Python: Select Interpreter`, and pick the entry containing `.venv`. Every
+  terminal opened *after* that starts activated, showing `(.venv)`. A terminal
+  opened before the selection does not change; open a new one with **+**.
+- **PowerShell may refuse the first time**, with
+  `Activate.ps1 cannot be loaded because running scripts is disabled on this system`.
+  That is Windows' default script policy. Allow scripts you run yourself, once
+  per computer, then activate again:
+
+  ```powershell
+  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+  ```
+
+- **Activation is a convenience, not a requirement.** Without it, type the
+  environment's Python by its full path instead of `python`:
+  `.venv\Scripts\python` (PowerShell), `.venv/Scripts/python` (Git Bash), or
+  `.venv/bin/python` (macOS/Linux). For example,
+  `.venv\Scripts\python scripts\run_nominal.py`. Windows keeps it in `Scripts`
+  in both shells; `bin` is macOS and Linux only.
+
+> **This guide writes `python` everywhere.** With the environment active, that
+> is exactly what you type. A bare `python` in a terminal that is *not*
+> activated runs your computer's own Python, which fails at the first import:
+>
+> ```
+> ModuleNotFoundError: No module named 'yaml'
+> ```
+>
+> (or `'rocketpy'`, or `'numpy'` — whichever it reaches first). Nothing is
+> broken; activate and run it again.
+
+**Slashes.** Paths after `python`, like `scripts/run_nominal.py` or
+`config/vehicles/full_scale.yaml`, are read by Python, which accepts forward
+slashes on every system. That is why the commands in this guide use `/` and
+work unchanged in PowerShell. Only commands PowerShell itself runs, like `cd`,
+need care, and those are given in both forms.
+
+## 0.4 Get the team's latest work, and save your own
+
+Several people edit the same vehicle files, and git keeps that orderly. These
+commands are identical in PowerShell and Git Bash:
+
+```bash
+git pull                       # start with everyone else's latest work
+# ... edit config/vehicles/full_scale.yaml, run some analyses ...
+git status                     # what did I change?
+git diff                       # exactly what, line by line
+git add config/vehicles/full_scale.yaml   # choose what goes in this snapshot
+git commit -m "Raise fin span to 7.5 in for stability margin"
+git push                       # share it
+```
+
+**Pull before you start, push when you stop.** Most git trouble comes from
+skipping the first. `git status` changes nothing and usually tells you what to
+type next, so use it whenever you are unsure.
+
+**Say why in the message.** "Raise fin span to 7.5 in for stability margin"
+tells a teammate the story; "update" does not. The *what* is already in the
+diff.
+
+**Name the files you add.** Don't use `git add .` or `git add -A`: they sweep up
+stray files. `output/`, `.venv/` and the OpenRocket jar are already excluded,
+and everything in `output/` can be regenerated from the configs, so commit
+configs, never results.
+
+In VS Code, the Source Control panel (Ctrl+Shift+G) does the same with buttons:
+it lists changed files, shows a diff when you click one, stages with **+**,
+takes the message in the box at the top, and pulls and pushes with **Sync**.
+
+**Trying something that might not work** — a new fin set, a different motor —
+goes on a branch, so `main` always runs:
+
+```bash
+git switch -c yourname/fin-trade      # create a branch and move onto it
+git push -u origin yourname/fin-trade # first push; later just `git push`
+git switch main                       # back to the shared version
+```
+
+Merge it into `main` through a pull request on GitHub when it is good, or
+simply switch back to `main` if it is not.
+
+**When git reports a conflict**, two people changed the same lines. Git marks
+the spot in the file:
+
+```
+<<<<<<< HEAD
+    height_in: 7.50
+=======
+    height_in: 8.00
+>>>>>>> yourname/fin-trade
+```
+
+Keep the version you want, delete the three marker lines, then `git add` the
+file and `git commit`. VS Code shows *Accept Current / Accept Incoming / Accept
+Both* buttons over each conflict, which is easier than editing by hand.
+
+**Undoing things:**
+
+| Situation | Command |
+|---|---|
+| Throw away my changes to one file | `git restore config/vehicles/full_scale.yaml` |
+| Unstage a file I added by mistake | `git restore --staged <file>` |
+| Set my work aside for a moment | `git stash`, later `git stash pop` |
+| See how a file changed over time | `git log -p config/vehicles/full_scale.yaml` |
+
+`git restore` discards work permanently, so read `git status` first. Once
+something is committed it can be recovered; before that, it cannot.
+
+## 0.5 Opening the results
+
+Runs write figures (`.png`), tables (`.md`), data (`.csv`) and OpenRocket files
+(`.ork`) under `output/`, and print where they went. No plot windows pop up. The
+easiest way to open them is to click them in VS Code's file tree: `.png` and
+`.md` open right there, and `.csv` reads well with the Rainbow CSV extension.
+From the terminal, open a file with your computer's default program:
+
+PowerShell:
+
+```powershell
+start output\template_full_scale\nominal\flight_profile_0lb.png
+```
+
+Git Bash:
+
+```bash
+start output/template_full_scale/nominal/flight_profile_0lb.png
+```
+
+macOS: `open` in place of `start`. Linux: `xdg-open`.
+
+A `.ork` file opens in the OpenRocket app (version 24.12), which is how you
+check the framework is modeling the rocket you think it is.
+
+## 0.6 The whole routine
+
+PowerShell:
+
+```powershell
+cd C:\Users\you\nasa-sli-sim
+.venv\Scripts\Activate.ps1
+git pull
+python scripts/run_nominal.py
+```
+
+Git Bash:
+
+```bash
+cd /c/Users/you/nasa-sli-sim
+source .venv/Scripts/activate
+git pull
+python scripts/run_nominal.py
+```
+
+In VS Code with `.venv` selected, the first two lines happen on their own: open
+a terminal, check for `(.venv)`, then `git pull`.
+
+If something fails before a simulation even starts, see
+[§6.0](#60-environment-errors).
 
 ---
 
@@ -257,15 +523,98 @@ python scripts/fit_cd.py data/flights/synthetic_vdf.csv --wind 9 --temp-f 68
 ```
 
 ```
-  Cd scale factor      : 1.1728  (+17.3% vs the pre-flight model)
-  Measured apogee      : 4,309 ft
-  Pre-flight prediction: 4,545 ft (+236 ft error)
-  Post-fit prediction  : 4,308 ft (-0 ft residual)
+  Cd scale factor      : 1.1757  (+17.6% vs the pre-flight model)
+  Measured apogee      : 4,929 ft
+  Pre-flight prediction: 5,279 ft (+351 ft error)
+  Post-fit prediction  : 4,929 ft (-0 ft residual)
   Ascent RMSE          : 9 ft
 ```
 
-The fitter recovered 1.173 against a true 1.180 — 0.6% error. That round-trip
+The fitter recovered 1.176 against a true 1.180 — 0.4% error. That round-trip
 is how you know the tool works before you trust it with real data.
+
+## 1.7 Comparing telemetry to the model
+
+The same command also wrote `data/flights/synthetic_telemetry.csv`: what a
+flight computer with a barometric altimeter, an IMU and a GPS would have logged
+on that flight, sensor noise included, with its clock started 2 s before
+ignition. It is practice data for the comparison you will make after the
+subscale and full-scale flights:
+
+```bash
+python scripts/compare_flight.py data/flights/synthetic_telemetry.csv --wind 9 --temp-f 68
+```
+
+```
+| quantity                  | units | simulated | measured | difference |
+| Apogee (baro)             | ft    | 5193.84   | 4840.50  | -353.34    |
+| Time to apogee            | s     | 17.47     | 16.63    | -0.84      |
+| Max axial acceleration    | g     | 11.55     | 11.47    | -0.08      |
+| Landing distance from pad | ft    | 1305.21   | 1232.25  | -72.97     |
+```
+
+It flies the model at the launch-day conditions you give (the same flags as
+`fit_cd.py`), puts the log and the simulation on one clock, and writes to
+`output/<vehicle>/postflight/`:
+
+- **`comparison_<log>.png`**: simulated over measured for each channel the log
+  has (altitude, axial acceleration, lateral acceleration, roll rate,
+  pitch/yaw rate, and the GPS ground track).
+- **`comparison_<log>.csv`**: the log with the simulation interpolated onto its
+  timestamps (`sim_*` beside each channel), for your own plots and statistics.
+
+**Read the figure for the physics, not just the gap.** The practice log has
+18% more drag than the model, and it shows everywhere drag acts: apogee
+353 ft low and 0.8 s early, and coast deceleration visibly stronger than the
+model's. Boost acceleration, which drag barely affects, matches. A real
+mismatch has a signature like that, and the signature tells you which input
+is wrong. Here, `fit_cd.py` is the fix.
+
+**Things that are not model errors:**
+
+- **The clocks.** Flight computers start at power-on or launch detection;
+  the simulation starts at ignition. The script aligns them where both cross
+  100 ft above the pad, so the x-axis is time from ignition. At sharp
+  transients, ignition and burnout, expect the two to be off by a sample or
+  so.
+- **Altitude.** The simulated line is *barometric* altitude: simulated
+  pressure run through the standard atmosphere, which is how an altimeter
+  computes it. On a non-standard day, it reads a few percent different from
+  true height, exactly as the real altimeter does. Compare like with like.
+- **Acceleration.** An accelerometer measures specific force: about +1 g
+  along the rocket on the pad, about −2 g at burnout, and near 0 at apogee,
+  never −1 g in free fall. The simulated column is computed the same way. A
+  log whose axial channel reads negative under thrust is from a board mounted
+  upside down; the script notices and flips it.
+- **Lateral axes.** Lateral IMU axes depend on how the board is mounted and
+  rolled, so lateral acceleration and pitch/yaw rate are compared as
+  magnitudes. The simulated rocket is perfectly symmetric, so its roll rate is
+  zero; a real one rolls a little from fin build tolerance.
+- **After the parachutes open,** the body-frame channels stop. The
+  simulation flies the descent as a point mass under the canopy, so it has no
+  attitude to compare there. Altitude and GPS continue to landing.
+
+**Real logs.** Columns are found by name (`Accel Z`, `Gyro X`, `Latitude`, and
+common variants, units in parentheses ignored). Accelerations are taken in g
+and rates in deg/s unless the header says `(m/s^2)` or `(rad/s)`. A logger that
+names things differently gets `--map`:
+
+```bash
+python scripts/compare_flight.py data/flights/subscale_1.csv --map accel_z_g="AccelAxial" --map gyro_z_dps="RollRate"
+```
+
+The fields are `time_s`, `altitude_ft`, `accel_x_g`, `accel_y_g`, `accel_z_g`
+(the rocket's long axis), `gyro_x_dps`, `gyro_y_dps`, `gyro_z_dps` (roll),
+`latitude_deg` and `longitude_deg`. Only time and altitude are required. The
+script prints which column it used for each field, so check that first.
+
+**Every simulated state, not just these.** Each `run_nominal.py` writes
+`output/<vehicle>/nominal/flight_states_<ballast>lb.csv`, the whole simulated
+flight at 100 Hz. It has position and GPS coordinates, velocity, Mach, body
+rates, attitude (quaternion, Euler angles, angle of attack), body-frame
+acceleration, pressure and barometric altitude, and a `phase` column (rail,
+powered, coast, under each parachute). It opens in Excel. Use it for anything
+the comparison figure does not plot.
 
 ---
 
@@ -311,6 +660,11 @@ To add one, copy the closest existing file and edit it:
 ```bash
 cp config/vehicles/full_scale.yaml config/vehicles/pdr_option_b.yaml
 ```
+
+`cp` works as written in both shells (PowerShell understands it as
+`Copy-Item`). Copying the file in VS Code's file tree works too. If the vehicle
+uses a mass worksheet (§2.10), copy that as well and point the new file's
+`mass_properties:` at the copy, so the two designs can change independently.
 
 Change `name:` first. **Output directories are derived from that name**, so two
 vehicles sharing a name overwrite each other — which is the one mistake this
@@ -555,10 +909,13 @@ it is permanently part of that section and it is what lands.
 Do not eyeball it. Build both models and compare:
 
 ```bash
-python scripts/check_against_ork.py \
-    --vehicle config/vehicles/full_scale.yaml \
-    --ork path/to/your_design.ork
+python scripts/check_against_ork.py --vehicle config/vehicles/full_scale.yaml --ork path/to/your_design.ork
 ```
+
+Keep it on one line. Splitting a long command across lines needs a different
+character in each shell — `\` at the end of a line in Git Bash, a backtick
+`` ` `` in PowerShell — and the wrong one gives a confusing error, so this guide
+never splits commands.
 
 It reports overall length, launch mass, CP and CG side by side, and exits
 non-zero when anything is outside tolerance. Read the deltas rather than looking
@@ -1274,10 +1631,162 @@ review panel, so some of the existing choices are not decoration:
 
 # Part 6 — Troubleshooting
 
-Installation and environment errors — `ModuleNotFoundError`, Java not found, a
-missing OpenRocket jar, Python 3.14 build failures, a slow first run — are
-covered in [Part 3 of the Setup Guide](SETUP_GUIDE.md#part-3--troubleshooting-the-installation).
-This part covers problems that appear once the framework is running.
+§6.0 covers errors that stop a script before any simulation starts — almost
+always the terminal, the folder, or the environment rather than the
+framework. §6.1 onward covers problems once it is running.
+
+## 6.0 Environment errors
+
+Before anything else, run the two checks from Part 0. Both are identical in
+every shell:
+
+```bash
+ls scripts
+python -c "import sys; print(sys.executable)"
+```
+
+The first should list the scripts (you are in the project folder); the second
+should print a path inside `.venv` (the environment is active). Most errors
+below are one of those two failing.
+
+### `ModuleNotFoundError: No module named 'yaml'`
+
+The same goes for `'rocketpy'`, `'numpy'`, `'jpype'`, or any other package.
+`python` is your computer's own Python, not the project's, because the
+environment is not active in this terminal. Activate it (§0.3) and run again:
+
+PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Git Bash:
+
+```bash
+source .venv/Scripts/activate
+```
+
+If the prompt already shows `(.venv)` and the error persists, the environment's
+packages are incomplete. Reinstall them (this is safe to repeat):
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+In VS Code, check that `Python: Select Interpreter` points at `.venv`, then open
+a *new* terminal with **+**. Terminals opened before the selection keep the old
+Python.
+
+### `ModuleNotFoundError: No module named 'slisim'`
+
+The script cannot find the framework's own code. You are running a copy of the
+script from somewhere else, or a script you wrote is outside `scripts/`. Run
+the scripts in place, from the project folder: `python scripts/run_nominal.py`.
+
+### `can't open file '...\scripts\run_nominal.py': [Errno 2] No such file or directory`
+
+Wrong folder. Look at the path in the message: it shows where the terminal is,
+and `scripts\` is not there. `cd` into the project folder (§0.2) and check with
+`ls scripts`.
+
+### `Activate.ps1 cannot be loaded because running scripts is disabled on this system`
+
+PowerShell only: Windows blocks scripts by default. Allow ones you run yourself,
+once per computer:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Or skip activation and type the full path, `.venv\Scripts\python`, in place of
+`python`.
+
+### `.venv\Scripts\Activate.ps1 is not recognized` / `.venv/Scripts/activate: No such file or directory`
+
+Either you are not in the project folder (§0.2), or the command came from the
+other shell's block. PowerShell activates with `Activate.ps1` and backslashes;
+Git Bash uses `source` and `activate` with forward slashes. If you are in the
+right folder and `.venv` is missing entirely, the environment was never created
+on this computer — that is an installation step, in Setup Guide §2.4–2.6.
+
+### `Python was not found; run without arguments to install from the Microsoft Store`
+
+Windows' placeholder `python` answered because the environment is not active and
+no system Python is on the PATH. Activate the environment (§0.3). Do **not**
+install Python from the Store to make this go away — the framework needs the
+environment's Python either way.
+
+### Java not found, or `UnsupportedClassVersionError`
+
+```
+RuntimeError: No Java 17+ runtime found. OpenRocket 24.12 needs one.
+```
+
+The OpenRocket engine runs on Java 17 or newer. Check what the terminal finds
+(identical in both shells):
+
+```bash
+java -version
+```
+
+If that fails or reports a version below 17, Java 17 is not installed or not on
+the PATH. Install it (Setup Guide §2.4) and open a new terminal. If it reports
+17 or newer but the framework still complains, an older Java is overriding it
+through `JAVA_HOME`. Point `JAVA_HOME` at the Java that works, for this terminal:
+
+PowerShell:
+
+```powershell
+$env:JAVA_HOME = (Get-Item (Get-Command java).Source).Directory.Parent.FullName
+```
+
+Git Bash:
+
+```bash
+export JAVA_HOME="$(cygpath -m "$(dirname "$(dirname "$(which java)")")")"
+```
+
+macOS / Linux:
+
+```bash
+export JAVA_HOME="$(dirname "$(dirname "$(which java)")")"
+```
+
+In Git Bash, the `cygpath -m` matters. It turns Git Bash's `/c/Program Files/...`
+into `C:/Program Files/...`, the only form Windows programs like Python and Java
+understand. Without it, `JAVA_HOME` looks right and silently does nothing. To
+check what is set: `echo $env:JAVA_HOME` in PowerShell, `echo "$JAVA_HOME"` in
+Git Bash.
+
+Those last only for the current terminal. To make the setting permanent on
+Windows:
+
+```powershell
+[Environment]::SetEnvironmentVariable("JAVA_HOME", $env:JAVA_HOME, "User")
+```
+
+On macOS or Linux, add the `export` line to `~/.zshrc` or `~/.bashrc`.
+
+### `FileNotFoundError: OpenRocket jar not found`
+
+The 80 MB OpenRocket engine in `vendor/` is not under git, so it is missing
+from every fresh clone and every new computer. Downloading it is installation
+step 5 in Setup Guide §2.4–2.6.
+
+### The first run takes about 30 seconds
+
+That is normal. Java starts, and OpenRocket loads its motor database and
+component presets. Later flights in the same run take under a second, and a
+Monte Carlo run pays the start-up once per worker process, not once per
+flight.
+
+### Still stuck
+
+Problems with the installation itself — a broken environment, Python 3.14 build
+errors, a download blocked by a corporate network — are in Setup Guide Part 3.
+That includes how to rebuild the environment from scratch, which fixes most
+things.
 
 ## 6.1 Monte Carlo cases fail
 
@@ -1337,6 +1846,23 @@ Nominal flight in both engines with full requirement checking.
 | `--out DIR` | `output/` | Output directory |
 
 Exit code 0 if no requirement FAILs, 1 otherwise — usable in CI.
+
+Besides the figures and the `.ork`, it writes `flight_states_<ballast>lb.csv`:
+every simulated state at 100 Hz, from ignition to landing ([§1.7](#17-comparing-telemetry-to-the-model)).
+
+### `compare_flight.py`
+
+Overlays a flight computer's log on the simulation of that flight. See
+[§1.7](#17-comparing-telemetry-to-the-model).
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `CSV` (positional) | required | The flight computer's CSV export |
+| `--map FIELD=COLUMN` | auto-detected | Name the log column for a field; repeat as needed |
+| `--ballast-lb X` | 0 | Ballast actually flown |
+| `--wind`, `--wind-dir`, `--temp-f`, `--pressure-inhg`, `--rail-angle` | site nominal | Launch-day conditions, as for `fit_cd.py` |
+| `--altitude-units {auto,ft,m}` | `auto` | Units of the log's altitude column |
+| `--vehicle PATH`, `--site KEY`, `--out DIR` | | As above |
 
 ### `run_montecarlo.py`
 
@@ -1437,15 +1963,40 @@ inside tolerance, 1 otherwise. See [§2.9](#29-from-an-openrocket-design-to-a-ve
 | `--noise-ft X` | 6.0 | Barometric noise, 1σ |
 | `--rate-hz X` | 20.0 | Sample rate |
 | `--wind-mph`, `--temp-f` | | Conditions to simulate |
+| `--out PATH` | `data/flights/synthetic_vdf.csv` | The altimeter file; `synthetic_telemetry.csv` is written beside it |
+
+Writes two files: an altimeter-only CSV for `fit_cd.py`, and a full telemetry
+log (barometric altitude, IMU, GPS) for `compare_flight.py`.
 
 ---
 
 # Appendix A — Cheat sheet
 
-```bash
-# Setup (once): see SETUP_GUIDE.md
+Start every session (Part 0). In VS Code with `.venv` selected, the first two
+lines happen on their own; just look for `(.venv)` in the prompt.
 
-# Every session (git basics: SETUP_GUIDE.md §2.3)
+PowerShell:
+
+```powershell
+cd C:\Users\you\nasa-sli-sim                      # the project folder
+.venv\Scripts\Activate.ps1                        # prompt shows (.venv)
+```
+
+Git Bash (macOS/Linux: `source .venv/bin/activate`):
+
+```bash
+cd /c/Users/you/nasa-sli-sim                      # the project folder
+source .venv/Scripts/activate                     # prompt shows (.venv)
+```
+
+Everything below is identical in both shells once `(.venv)` shows:
+
+```bash
+# Check the session (§6.0 if either looks wrong)
+ls scripts                                        # in the project folder?
+python -c "import sys; print(sys.executable)"     # path inside .venv?
+
+# Git (§0.4)
 git pull                                          # before you start
 git status                                        # what have I changed
 git add config/vehicles/full_scale.yaml           # choose what to save
@@ -1459,6 +2010,7 @@ python scripts/run_montecarlo.py -n 1000          # dispersion
 python scripts/plot_inputs.py                     # the uncertainty model
 python scripts/run_crossvalidate.py               # report table
 python scripts/fit_cd.py data/flights/vdf.csv --wind 11 --temp-f 64
+python scripts/compare_flight.py data/flights/vdf.csv --wind 11 --temp-f 64
 
 # Pick a vehicle (default: full_scale.yaml)
 python scripts/run_nominal.py --vehicle config/vehicles/subscale.yaml

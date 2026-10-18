@@ -541,3 +541,100 @@ def extract(flight, rocket, or_motor, keep_series: bool = True) -> RPResult:
             "mach": mach, "position_x_m": x, "position_y_m": y,
         }
     return res
+
+
+#  Body-frame columns that stop being physical once a parachute opens: RocketPy
+#  flies the descent as a point mass under the canopy, so attitude and rates
+#  after deployment are leftovers, not predictions.
+ASCENT_ONLY = ("accel_x_g", "accel_y_g", "accel_z_g",
+               "gyro_x_dps", "gyro_y_dps", "gyro_z_dps",
+               "q0", "q1", "q2", "q3", "attitude_deg", "angle_of_attack_deg",
+               "precession_deg", "nutation_deg", "spin_deg")
+
+
+def state_history(flight, dt: float = 0.01):
+    """Every simulated state, sampled the way a flight computer logs them.
+
+    One row per `dt` seconds from ignition to landing, as a DataFrame.  Beside
+    the states themselves (position, velocity, attitude, body rates) it carries
+    what each kind of sensor would have *read*, so a telemetry log overlays
+    without conversion:
+
+    * `baro_altitude_ft` -- altitude from simulated static pressure through
+      the standard atmosphere, relative to the pad, as an altimeter computes
+      it.  It differs from true `altitude_agl_ft` when the day is not
+      standard, and so does the real altimeter.
+    * `accel_*_g` -- specific force in body axes, which is what an
+      accelerometer measures: acceleration MINUS gravity, so +1 g along the
+      axis on the pad and about -drag/weight in coast, never -1 g.
+    * `gyro_*_dps` -- body angular rates.  z is the rocket's long axis (roll);
+      x and y are the lateral axes, at an arbitrary roll orientation.
+    * `latitude_deg`, `longitude_deg`, `altitude_msl_m` -- what a GPS reports.
+
+    Columns in ASCENT_ONLY are blank after the first deployment.
+    """
+    import pandas as pd
+
+    f = flight
+    t = np.arange(0.0, float(f.t_final), dt)
+    ev = lambda fn: np.asarray(fn(t), dtype=float)  # noqa: E731 - vectorised Function call
+
+    z = ev(f.z)
+    p = ev(f.pressure)
+    g = np.asarray(f.env.gravity(z), dtype=float)
+    a_inertial = np.stack([ev(f.ax), ev(f.ay), ev(f.az) + g], axis=1)   # a - g, g = (0,0,-g)
+    q = np.stack([ev(f.e0), ev(f.e1), ev(f.e2), ev(f.e3)], axis=1)
+    q /= np.linalg.norm(q, axis=1, keepdims=True)
+    w, x_, y_, z_ = q.T
+    # RocketPy's body-to-inertial matrix (Matrix.transformation); body = K^T @ inertial.
+    K = np.array([
+        [1 - 2 * (y_**2 + z_**2), 2 * (x_ * y_ - w * z_), 2 * (x_ * z_ + w * y_)],
+        [2 * (x_ * y_ + w * z_), 1 - 2 * (x_**2 + z_**2), 2 * (y_ * z_ - w * x_)],
+        [2 * (x_ * z_ - w * y_), 2 * (y_ * z_ + w * x_), 1 - 2 * (x_**2 + y_**2)],
+    ]).transpose(2, 0, 1)
+    f_body = np.einsum("nji,nj->ni", K, a_inertial) / U.G0
+
+    def std_alt_m(pa):
+        return 44330.77 * (1.0 - (pa / 101325.0) ** 0.190263)
+
+    rad_s_to_dps = 180.0 / math.pi
+    df = pd.DataFrame({
+        "time_s": t,
+        "phase": "",
+        "altitude_agl_ft": U.m_to_ft(z - f.env.elevation),
+        "baro_altitude_ft": U.m_to_ft(std_alt_m(p) - std_alt_m(p[0])),
+        "pressure_pa": p,
+        "latitude_deg": ev(f.latitude),
+        "longitude_deg": ev(f.longitude),
+        "altitude_msl_m": z,
+        "east_ft": U.m_to_ft(ev(f.x)),
+        "north_ft": U.m_to_ft(ev(f.y)),
+        "vel_east_fps": U.mps_to_fps(ev(f.vx)),
+        "vel_north_fps": U.mps_to_fps(ev(f.vy)),
+        "vel_up_fps": U.mps_to_fps(ev(f.vz)),
+        "speed_fps": U.mps_to_fps(ev(f.speed)),
+        "mach": ev(f.mach_number),
+        "accel_x_g": f_body[:, 0],
+        "accel_y_g": f_body[:, 1],
+        "accel_z_g": f_body[:, 2],
+        "gyro_x_dps": ev(f.w1) * rad_s_to_dps,
+        "gyro_y_dps": ev(f.w2) * rad_s_to_dps,
+        "gyro_z_dps": ev(f.w3) * rad_s_to_dps,
+        "q0": q[:, 0], "q1": q[:, 1], "q2": q[:, 2], "q3": q[:, 3],
+        "attitude_deg": ev(f.attitude_angle),
+        "angle_of_attack_deg": ev(f.angle_of_attack),
+        "precession_deg": ev(f.psi),
+        "nutation_deg": ev(f.theta),
+        "spin_deg": ev(f.phi),
+    })
+
+    # Phase labels, in the order things happen.
+    events = [(0.0, "rail"), (float(f.out_of_rail_time), "powered"),
+              (float(f.rocket.motor.burn_out_time), "coast")]
+    deploys = sorted((float(e[0]), f"under {e[1].name}")
+                     for e in (getattr(f, "parachute_events", None) or []))
+    for start, label in sorted(events + deploys):
+        df.loc[df["time_s"] >= start, "phase"] = label
+    if deploys:
+        df.loc[df["time_s"] >= deploys[0][0], list(ASCENT_ONLY)] = np.nan
+    return df
