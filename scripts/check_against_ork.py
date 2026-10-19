@@ -78,6 +78,12 @@ def fin_sets(rocket) -> int:
                if "FinSet" in str(c.getClass().getSimpleName()))
 
 
+def fin_cross_sections(rocket) -> set[str]:
+    """Each fin set's edge profile, as the yaml spells it (square, rounded, airfoil)."""
+    return {str(c.getCrossSection().name()).lower() for c in _walk(rocket)
+            if "FinSet" in str(c.getClass().getSimpleName())}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -106,6 +112,16 @@ def main() -> int:
         print(f"  NOTE: the .ork has {n_theirs} fin set(s), the vehicle file has "
               f"{n_ours}.\n        Every comparison below is affected. A duplicated "
               f"fin set in the .ork\n        inflates CP, margin and mass.\n")
+
+    # Not in the table: the edge profile barely moves CP, CG or mass, so every
+    # quantity below can pass while the two models fly a few hundred feet apart.
+    x_theirs, x_ours = fin_cross_sections(theirs), fin_cross_sections(ours)
+    if x_theirs and x_theirs != x_ours:
+        print(f"  NOTE: the .ork's fins are {'/'.join(sorted(x_theirs))}-section, the "
+              f"vehicle file's are {'/'.join(sorted(x_ours))}.\n        The table "
+              f"below cannot show it, but drag and apogee differ. Set\n        "
+              f"`cross_section: {sorted(x_theirs)[0]}` under `fins:` if that is how "
+              f"the fins are built\n        (USER_GUIDE section 2.3).\n")
 
     print(f"  {'quantity':<12}{'.ork':>12}{'yaml':>12}{'delta':>12}   {'tol':>6}")
     print("  " + "-" * 56)

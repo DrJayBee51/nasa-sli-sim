@@ -735,6 +735,7 @@ fins:
   cant_deg: 0.0
   offset_from_aft_in: 0.50  # trailing edge forward of the aft airframe end
   mass_lb: 3.20             # whole fin can, all fins together
+  cross_section: square     # square | rounded | airfoil (optional; default square)
 ```
 
 ```
@@ -750,6 +751,24 @@ Fins are the main lever on static stability. On the template, going from
 12×5×5.5 in to 15×6×7.5 in moved the margin from 1.40 to 2.18 calibers — the
 difference between failing and passing requirement 2.11 — at a cost of about 45
 ft of apogee.
+
+**`cross_section` is the fins' edge profile**, and it matters more than its
+size suggests. It hardly moves CP, CG or mass, so stability is unaffected, but
+it sets how much drag the fins' leading and trailing edges make:
+
+| Value | What the fins look like | OpenRocket's name |
+|---|---|---|
+| `square` | Flat plate with square, unsanded edges — a laser- or router-cut sheet, or a flat print | *Square* |
+| `rounded` | Flat plate with the edges rounded over | *Rounded* |
+| `airfoil` | A real profile: thick in the middle, tapering to sharp edges, sanded or printed that way | *Airfoil* |
+
+On one 5.15 in team vehicle, square edges raised the total drag coefficient
+from 0.32 to 0.41 and cost about 250 ft of apogee against airfoiled fins.
+Choose the value for the fins you will **build**, not the ones you hope to:
+`square` is the default because it is the conservative one. Both engines get
+it — RocketPy flies OpenRocket's drag curve — and `check_against_ork.py` warns
+when your `.ork` uses a different profile, because none of the length, mass,
+CP or CG comparisons can show it.
 
 ## 2.4 Transitions
 

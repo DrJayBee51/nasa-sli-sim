@@ -235,6 +235,18 @@ def _apply_mass_sheet(d: dict, path: Path) -> dict:
     return d
 
 
+FIN_CROSS_SECTIONS = ("square", "rounded", "airfoil")
+
+
+def _fin_cross_section(fins: dict, path: Path) -> str:
+    """`fins: cross_section:`, defaulting to square, the conservative choice."""
+    value = str(fins.get("cross_section", "square")).strip().lower()
+    if value not in FIN_CROSS_SECTIONS:
+        raise ValueError(f"{path.name}: fins.cross_section {fins['cross_section']!r} "
+                         f"is not one of {list(FIN_CROSS_SECTIONS)}")
+    return value
+
+
 def _as_mapping(item: Any, index: int, block: str, path: Path) -> dict:
     """One entry of a list-of-mappings yaml block.
 
@@ -342,6 +354,11 @@ class Vehicle:
     # The mass worksheet, when the vehicle file names one.  Monte Carlo draws
     # per-part dispersions from it; without one, only `dry_mass` disperses.
     mass_sheet: Path | None = None
+
+    # Fin edge profile: square | rounded | airfoil.  It barely moves CP but
+    # sets the fins' pressure drag -- square edges add ~25% to a typical USLI
+    # vehicle's total drag over airfoiled ones, a few hundred feet of apogee.
+    fin_cross_section: str = "square"
 
     # ------------------------------------------------------------------
     @classmethod
@@ -498,6 +515,7 @@ class Vehicle:
             ballast_max_kg=U.lb_to_kg(float(ba.get("max_lb", 0.0))),
             ballast_location=ba.get("location", sections[0].name if sections else ""),
             mass_sheet=mass_sheet_path(d, path) if d.get("mass_properties") else None,
+            fin_cross_section=_fin_cross_section(fn, path),
         )
 
     # --- derived geometry ---------------------------------------------

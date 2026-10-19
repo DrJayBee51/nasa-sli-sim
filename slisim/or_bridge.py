@@ -437,6 +437,8 @@ def build_document(vehicle: Vehicle, ballast_kg: float = 0.0):
         vehicle.fin_sweep_m, vehicle.fin_height_m, vehicle.fin_thickness_m,
     )
     fins.setCantAngle(math.radians(vehicle.fin_cant_deg))
+    CrossSection = jpype.JClass("info.openrocket.core.rocketcomponent.FinSet$CrossSection")
+    fins.setCrossSection(getattr(CrossSection, vehicle.fin_cross_section.upper()))
     fins.setAxialMethod(AxialMethod.BOTTOM)
     fins.setAxialOffset(-vehicle.fin_offset_from_aft_m)
     fins.setFinish(finish)
