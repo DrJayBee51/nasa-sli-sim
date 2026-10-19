@@ -1032,36 +1032,174 @@ Payload Airframe,Main Parachute,main,2.600,0,,,15.00,0,39.00,101.400,...,0,vendo
 Payload Airframe,SECTION,,15.800,,36.00,24.00,17.57,,41.57,656.800,...
 ```
 
-| Column | You fill in | Meaning |
-|---|---|---|
-| `section` | yes | The tube the part physically sits in. Sections run nose to tail: the nose cone first, then the body tubes, then any transition, which follows the tube above it. |
-| `component` | yes | One thing you can put on a scale. |
-| `kind` | yes | What it counts toward: `structure`, `tethered`, `fins`, `main`, `drogue`, `shock_cord`. A main packed in the payload tube is still `main`. |
-| `mass_lb` | yes | The part's mass. |
-| `from_section_front_in` | yes | The part's CG, measured from the front of **its own** section. Moving a section does not move its parts. |
-| `inertia_pitch_lb_in2`, `inertia_roll_lb_in2` | yes | The part's own inertia about its own CG (below). |
-| `*_sigma_*` | yes | Its uncertainty (below). 0 means exact. |
-| `source` | yes | `weighed`, `cad`, `vendor`, `override`, `ork`, `estimated`, or `CONFIRM`. `CONFIRM` means nobody has stood behind the number yet. |
-| everything else | no | Derived: positions from the nose tip, moments, and the `SECTION` and `AGGREGATE` totals. They are stored so you can follow the arithmetic, and checked rather than trusted. |
+The sheet has three kinds of row:
 
-A `SECTION` row closes each section with its length; the `AGGREGATE` block at the
-bottom combines the sections into the dry vehicle (no motor, no ballast). The
-motor comes from OpenRocket's database and ballast is a range in the yaml, so
-neither appears here.
+- **Part rows**, one per thing you can put on a scale, grouped by section.
+- **A `SECTION` row** closing each section. It carries that section's length
+  and its totals.
+- **The `AGGREGATE` block** at the bottom: one row per section, then
+  `VEHICLE TOTAL`, the dry vehicle (no motor, no ballast). The motor comes from
+  OpenRocket's database and ballast is a range in the yaml, so neither appears
+  here.
+
+### Which cells you type — and which you never do
+
+**You type only the input cells. Every other number in the file is computed
+for you by `check_mass_csv.py --fix`.** The derived cells are stored so you can
+follow the arithmetic, but a CSV cannot hold Excel formulas, so they do not
+update when you change an input: change one mass and its moment, its section's
+totals and the vehicle total are all left stale. The checker refuses a sheet
+with stale cells, and a vehicle whose sheet is refused will not load. Do not
+recompute them by hand; run `--fix`.
+
+On a **part row**:
+
+| Column | Type it? | What goes in it |
+|---|---|---|
+| `section` | **yes** | The section the part physically sits in, spelled exactly like its `SECTION` row. Sections run nose to tail: the nose cone first, then the body tubes, then any transition, which follows the tube above it. |
+| `component` | **yes** | A name for the part. |
+| `kind` | **yes** | What it counts toward: `structure`, `tethered`, `fins`, `main`, `drogue` or `shock_cord`. A main packed in the payload tube is still `main`. |
+| `mass_lb` | **yes** | The part's mass, in pounds. |
+| `mass_sigma_pct` | **yes** | Its mass uncertainty, % one-sigma; `0` means exact (below). |
+| `from_section_front_in` | **yes** | Where the part's **center of mass** sits, in inches from the front of **its own section**, not from the nose tip and not the part's front edge. |
+| `position_sigma_in` | **yes** | Its position uncertainty, inches one-sigma. |
+| `inertia_pitch_lb_in2`, `inertia_roll_lb_in2` | **yes** | The part's own inertia about its own center of mass ([below](#inertia)). `0` for a small part. |
+| `inertia_sigma_pct` | **yes** | Its inertia uncertainty, % one-sigma. |
+| `source` | **yes** | `weighed`, `cad`, `vendor`, `override`, `ork`, `estimated` or `CONFIRM`. `CONFIRM` means nobody has stood behind the number yet. |
+| `note` | optional | Anything a teammate should know. |
+| `length_in`, `section_front_in` | **no** | Blank on part rows. |
+| `from_nose_tip_in`, `moment_lb_in` | **no** | Computed. |
+
+On a **`SECTION` row**, type only the section name in `section`, the word
+`SECTION` in `component`, and its **`length_in`** (the section's overall
+length). Everything else on it is computed. **Never type in the `AGGREGATE`
+block**; `--fix` rewrites all of it, adding and removing rows as sections come
+and go.
 
 A **`tethered`** part — a payload that rides in its tube on the pad but lands on
 its own tether — counts toward its section's flight mass and becomes its own
 piece at landing. Name it in `landing_sections:` by its `component`.
 
-After any edit, run:
+### Editing the worksheet, step by step
 
-```bash
-python scripts/check_mass_csv.py
-```
+1. **Work on your own copy.** Edit your team's worksheet, never
+   `fullscale_model_a.csv` or `full_scale.csv`, which are references. To start
+   one, copy the closest existing sheet, and point your vehicle file at the copy
+   (`mass_properties: team_design.csv`):
 
-It recomputes every derived cell and names the line to fix, so a changed mass
-with a stale moment beside it cannot slip through. Excel's "CSV UTF-8" format
-is fine.
+   ```bash
+   cp config/mass/fullscale_model_a.csv config/mass/team_design.csv
+   ```
+
+2. **Change only the input cells** in the table above. Excel or VS Code both
+   work (VS Code's Rainbow CSV extension colors the columns). New rows can leave
+   every computed cell blank.
+
+3. **Save as CSV.** In Excel: *File → Save As → CSV UTF-8 (Comma delimited)
+   (\*.csv)*, keeping the same name, and answer *Keep current format* if asked.
+   Never save it as `.xlsx`; the framework reads only `.csv`. Then **close the
+   file in Excel**: Excel locks an open file on Windows, and the next step
+   cannot write to it.
+
+4. **Recompute the derived cells:**
+
+   ```bash
+   python scripts/check_mass_csv.py --fix
+   ```
+
+   It rewrites every computed cell from your inputs and then checks the result,
+   ending in `pass` for each sheet. It never changes a cell you typed. If it
+   reports a problem it cannot fix, that problem is in an input cell — see
+   [Reading the checker's messages](#reading-the-checkers-messages).
+
+5. **Check the vehicle as a whole:**
+
+   ```bash
+   python scripts/run_nominal.py --vehicle config/vehicles/team_design.yaml
+   ```
+
+   Read the `FRR-V Mass budget closure` line (it should read 0.00 lb) and look at
+   whether the launch mass and stability moved the way you expected. The checker
+   confirms the arithmetic, not the numbers: a shock cord typed as 2.34 lb
+   instead of 0.0234 passes every check and quietly moves the CG. If the design
+   also lives in OpenRocket, compare the two with `check_against_ork.py` (§2.9).
+
+6. **Commit the worksheet** (and the vehicle file, if you changed it):
+
+   ```bash
+   git add config/mass/team_design.csv
+   git commit -m "Weighed payload airframe parts"
+   git push
+   ```
+
+> **If you edit in Excel on your own computer and run the framework somewhere
+> else** — a Codespace, a teammate's laptop — then after step 4 the copy in the
+> project folder is the correct one, not the one on your desktop. Download it
+> (in a Codespace: right-click the file → *Download*) before your next round of
+> edits, or your next upload brings the stale cells back.
+
+### Common edits
+
+**Change a mass you have weighed.** Type the new `mass_lb` and set `source` to
+`weighed`. If the part's shape has not changed, scale its two inertias by the
+same ratio (new mass ÷ old mass) — inertia is proportional to mass for a fixed
+shape — or the sheet keeps the old part's inertia. Then step 4.
+
+**Add a part.** Insert a row anywhere among that section's other parts — above
+its `SECTION` row, never below it and never in the `AGGREGATE` block. Fill the
+input cells, leave the computed ones blank, then step 4.
+
+**Remove a part.** Delete its row, then step 4. If something else rode inside it
+(a tethered payload), check `landing_sections:` still names only parts that
+exist.
+
+**Move a part to another section.** Cut its row into the other section's group,
+change its `section` cell, and re-measure `from_section_front_in` from the front
+of the *new* section. Then step 4.
+
+**Add or rename a section.** Sections are defined by the worksheet, but the
+vehicle file refers to them by name in three places, which must match exactly:
+`landing_sections:` members, `ballast: location:`, and the `name:` of any
+transition (a transition in the worksheet needs an entry under `transitions:`
+in the yaml with the same name, giving its diameters and shape). A new section
+needs at least one part row and a `SECTION` row with its `length_in`. Then
+step 4, and run `python scripts/check_landing_partition.py` to confirm every
+piece is still assigned to a landing section.
+
+### Reading the checker's messages
+
+Every message names the line number as Excel shows it (line 1 is the header).
+
+| Message | Which cells | What to do |
+|---|---|---|
+| `... reads 0.519 but works out to 13.986` | computed | Run `--fix`. |
+| `... should be blank` | computed | Run `--fix`. |
+| `line 9: expected Payload Airframe / Coupler here, found ...` | computed | Rows were added, removed or reordered; run `--fix`. |
+| `the AGGREGATE block should have 5 rows` | computed | A section was added or removed; run `--fix`. |
+| `... mass_lb '1.27O' is not a number` | **input** | Fix the typo. A sigma left blank also lands here: type `0`. |
+| `... kind 'Structure' is not one of [...]` | **input** | Use one of the listed words, exactly as written (lower case). |
+| `... source 'scale' is not one of [...]` | **input** | Use one of the listed words. |
+| `... mass_lb -0.2 is below 0` | **input** | Masses, inertias and sigmas cannot be negative. |
+| `'Booster' appears twice; keep each section's parts together` | **input** | Move all of that section's rows into one group above its `SECTION` row. |
+| `'Booster' starts before 'Payload' has its SECTION row` | **input** | A `SECTION` row is missing or out of place. |
+| `SECTION row for 'Booster' has no parts above it` | **input** | Its parts are missing or misspelled in the `section` column. |
+| `'Boattail' has no SECTION row closing it` | **input** | Add the section's `SECTION` row with its `length_in`. |
+| `... length_in '' is not a positive number` | **input** | Type the section's length on its `SECTION` row. |
+| `... comes after the AGGREGATE block` | **input** | Move the row up into its section. |
+| `line 1 is not the column-name row` | **input** | The header row is missing or changed. Copy it from another worksheet. |
+
+`--fix` handles everything marked *computed*. It will not touch a sheet with an
+*input* problem, because it cannot guess what you meant, so fix those by hand
+first, then run `--fix` again.
+
+Two errors come from the vehicle file rather than the worksheet:
+
+- `... has 3 problem(s); run scripts/check_mass_csv.py` when running a
+  simulation means the worksheet is not clean. Run step 4.
+- `nose_cone.mass_lb comes from team_design.csv; delete it from the yaml`
+  means the vehicle file still types a mass the worksheet now supplies. Delete
+  that key from the yaml; with a worksheet, the yaml holds no lengths, masses
+  or positions.
 
 ### Inertia
 
@@ -1768,6 +1906,14 @@ Windows:
 
 On macOS or Linux, add the `export` line to `~/.zshrc` or `~/.bashrc`.
 
+### `team_design.csv has 24 problem(s); recompute them with: python scripts/check_mass_csv.py --fix`
+
+The vehicle's mass worksheet was edited and its computed cells (moments,
+totals) are stale. Run what it says, then run again. If the message instead
+says *these are cells you typed*, the problem is in an input cell — a typo, a
+blank sigma, a misspelled section — and the lines listed say where. See
+§2.10, *Editing the worksheet, step by step*.
+
 ### `FileNotFoundError: OpenRocket jar not found`
 
 The 80 MB OpenRocket engine in `vendor/` is not under git, so it is missing
@@ -1910,10 +2056,15 @@ workers. Exits non-zero if they diverge.
 
 ### `check_mass_csv.py`
 
-No flags. Recomputes every derived cell of every worksheet in `config/mass/`,
-checks the mass model the simulation flies against each sheet's totals, and
-checks that per-part draws scatter by the sigmas asked for. Run it after any
-worksheet edit (§2.10). Exits non-zero on any problem.
+Recomputes every derived cell of every worksheet in `config/mass/` and reports
+any that disagree, checks the mass model the simulation flies against each
+sheet's totals, and checks that per-part draws scatter by the sigmas asked for.
+Run it after any worksheet edit (§2.10). Exits non-zero on any problem.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--fix` | off | Rewrite every derived cell from the input cells, then check. Never changes an input; leaves a sheet with input problems untouched. |
+| `FILE ...` (positional) | every sheet in `config/mass/` | Check (or fix) only these worksheets |
 
 ### `check_landing_partition.py`
 
@@ -2009,6 +2160,7 @@ python scripts/list_motors.py --nasa              # pick a motor
 python scripts/run_montecarlo.py -n 1000          # dispersion
 python scripts/plot_inputs.py                     # the uncertainty model
 python scripts/run_crossvalidate.py               # report table
+python scripts/check_mass_csv.py --fix           # after editing a mass worksheet
 python scripts/fit_cd.py data/flights/vdf.csv --wind 11 --temp-f 64
 python scripts/compare_flight.py data/flights/vdf.csv --wind 11 --temp-f 64
 

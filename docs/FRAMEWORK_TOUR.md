@@ -99,9 +99,11 @@ members of the `Booster + Boattail` landing section. Does anything fail? What
 is reported, and by which check?
 
 Put it back, then try instead adding 0.5 lb to the `AV Bay` row of the
-worksheet. Run `python scripts/check_mass_csv.py` first and correct the cells
-it names — the moment beside the mass, and every total below it — then re-run.
-Which numbers moved, and why did the mass budget still close?
+worksheet. Run `python scripts/check_mass_csv.py` and read what it reports:
+the moment beside that mass, and every total below it, are now stale. Run it
+again with `--fix`, which recomputes them, then re-run the flight. Which
+numbers moved, and why did the mass budget still close? Put the worksheet back
+with `git restore config/mass/full_scale.csv` afterward.
 
 **Answer this:** the `landing_sections` block does not describe any physical
 part of the rocket. Why does the framework need it, and which requirement is

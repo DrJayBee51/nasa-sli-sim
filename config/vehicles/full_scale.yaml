@@ -13,8 +13,8 @@
 #
 #  Masses, section lengths and part positions come from the worksheet named in
 #  `mass_properties:`.  This file holds shapes, the motor, recovery hardware and
-#  engineering decisions.  After editing the worksheet, run
-#  `python scripts/check_mass_csv.py`.
+#  engineering decisions.  After editing the worksheet, recompute its totals
+#  with `python scripts/check_mass_csv.py --fix` (USER_GUIDE section 2.10).
 #
 #  Units are imperial (in / lb / ft) to match the handbook and how the team
 #  will think about the vehicle.  Conversion to SI happens in slisim.units.

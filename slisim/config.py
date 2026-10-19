@@ -150,8 +150,12 @@ def _apply_mass_sheet(d: dict, path: Path) -> dict:
     sheet_path = mass_sheet_path(d, path)
     sheet, problems = massprops.read(sheet_path)
     if problems:
-        raise ValueError(f"{sheet_path.name} has {len(problems)} problem(s); run "
-                         f"scripts/check_mass_csv.py:\n  " + "\n  ".join(problems))
+        hint = ("recompute them with: python scripts/check_mass_csv.py --fix"
+                if sheet is not None else
+                "these are cells you typed -- correct them, then run "
+                "python scripts/check_mass_csv.py --fix")
+        raise ValueError(f"{sheet_path.name} has {len(problems)} problem(s); {hint}"
+                         f"\n  " + "\n  ".join(problems))
     roll = massprops.rollup(sheet)
     secs, kinds = roll["sections"], roll["kinds"]
     names = [n for n, _ in sheet.sections]

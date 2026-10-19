@@ -1,6 +1,8 @@
 """Check that every derived cell in a mass-properties worksheet still adds up.
 
-    python scripts/check_mass_csv.py
+    python scripts/check_mass_csv.py                  # check every worksheet
+    python scripts/check_mass_csv.py --fix            # ...and rewrite stale derived cells
+    python scripts/check_mass_csv.py --fix config/mass/team_design.csv
 
 The worksheets in `config/mass/` store derived cells -- positions from the nose
 tip, moments, and every SECTION and AGGREGATE total -- so a student can follow
@@ -12,6 +14,14 @@ This recomputes all of it, using the same code the loader uses
 what a correct sheet is.  Run it after editing a worksheet.  Exits 0 if every
 sheet is correct, 1 otherwise.
 
+--fix rewrites every derived cell from the input cells, so after changing a
+mass or a position you never recompute a moment or a total by hand.  It never
+changes an input: a mass, position, inertia, sigma, section length, kind,
+source or note stays exactly as typed.  A sheet whose INPUTS cannot be read
+(text in a number column, an unknown kind, a section with no SECTION row) is
+left untouched and its problems listed, because there is nothing safe to
+compute from it.
+
 It also checks `massprops.state`, which the simulation flies: its nominal must
 match each sheet's VEHICLE TOTAL, and its Monte Carlo draws must scatter
 around the nominal by the sigmas asked for.
@@ -19,7 +29,9 @@ around the nominal by the sigmas asked for.
 
 from __future__ import annotations
 
+import argparse
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -70,16 +82,61 @@ def check_draws() -> None:
     assert massprops.state(sheet, None, 0.5, "B")["members"]["B"] == 0.5
 
 
+def check_fix() -> None:
+    """--fix must repair stale derived cells and leave every input as typed."""
+    sheet = massprops.Sheet(
+        [("A", D(10))],
+        [massprops.Part("A", "a", "structure", D("2.000"), D("5.00"), "estimated")])
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "t.csv"
+        massprops.write(sheet, path)
+        lines = path.read_text(encoding="utf-8").splitlines()
+        lines[1] = lines[1].replace(",2.000,", ",3.000,", 1)   # new mass, stale moment
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        stale, problems = massprops.read(path)
+        assert stale is not None and problems, "stale sheet should read with problems"
+        massprops.write(stale, path)
+        fixed, problems = massprops.read(path)
+        assert not problems, problems
+        assert fixed.parts[0].mass_lb == D("3.000"), "an input changed"
+
+
+def fix(path: Path, sheet: massprops.Sheet) -> bool:
+    """Rewrite a sheet's derived cells from its inputs; True if it now passes."""
+    try:
+        massprops.write(sheet, path)
+    except PermissionError:
+        print(f"  FAIL  {path.name}: cannot write it -- close it in Excel, then run again")
+        return False
+    return not massprops.read(path)[1]
+
+
 def main() -> int:
-    files = sorted(MASS_DIR.glob("*.csv"))
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("files", nargs="*", type=Path,
+                    help="worksheets to check (default: every one in config/mass/)")
+    ap.add_argument("--fix", action="store_true",
+                    help="rewrite stale derived cells from the input cells")
+    args = ap.parse_args()
+
+    files = args.files or sorted(MASS_DIR.glob("*.csv"))
     if not files:
         print(f"No worksheets in {MASS_DIR}")
         return 1
 
     check_draws()
-    failed = 0
+    check_fix()
+    failed = stale = 0
     for path in files:
         sheet, problems = massprops.read(path)
+        if problems and sheet is not None and args.fix:
+            n = len(problems)
+            if not fix(path, sheet):
+                failed += 1
+                continue
+            print(f"  fixed {path.name}  ({n} derived-cell problem(s) rewritten)")
+            sheet, problems = massprops.read(path)
         if sheet is not None and not problems:
             problems = state_problems(sheet)
         if problems:
@@ -87,11 +144,19 @@ def main() -> int:
             print(f"  FAIL  {path.name}")
             for line in problems:
                 print(f"          {line}")
+            if sheet is None:
+                print("          ^ these are input cells: correct them by hand "
+                      "(--fix cannot guess an input)")
+            else:
+                stale += 1
         else:
             print(f"  pass  {path.name}")
 
     if failed:
         print(f"\n{failed} of {len(files)} worksheets have problems.")
+        if stale and not args.fix:
+            print("Only derived cells are wrong in some -- rewrite them with:")
+            print("    python scripts/check_mass_csv.py --fix")
     return 1 if failed else 0
 
 
